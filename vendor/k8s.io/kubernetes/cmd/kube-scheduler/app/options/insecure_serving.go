@@ -53,8 +53,12 @@ func (o *CombinedInsecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 func (o *CombinedInsecureServingOptions) applyTo(c *schedulerappconfig.Config, componentConfig *kubeschedulerconfig.KubeSchedulerConfiguration) error {
-	updateAddressFromDeprecatedInsecureServingOptions(&componentConfig.HealthzBindAddress, o.Healthz)
-	updateAddressFromDeprecatedInsecureServingOptions(&componentConfig.MetricsBindAddress, o.Metrics)
+	if err := updateAddressFromDeprecatedInsecureServingOptions(&componentConfig.HealthzBindAddress, o.Healthz); err != nil {
+		return err
+	}
+	if err := updateAddressFromDeprecatedInsecureServingOptions(&componentConfig.MetricsBindAddress, o.Metrics); err != nil {
+		return err
+	}
 
 	if err := o.Healthz.ApplyTo(&c.InsecureServing, &c.LoopbackClientConfig); err != nil {
 		return err
@@ -94,40 +98,50 @@ func (o *CombinedInsecureServingOptions) ApplyToFromLoadedConfig(c *schedulerapp
 		return nil
 	}
 
-	updateDeprecatedInsecureServingOptionsFromAddress(o.Healthz, componentConfig.HealthzBindAddress)
-	updateDeprecatedInsecureServingOptionsFromAddress(o.Metrics, componentConfig.MetricsBindAddress)
+	if err := updateDeprecatedInsecureServingOptionsFromAddress(o.Healthz, componentConfig.HealthzBindAddress); err != nil {
+		return fmt.Errorf("invalid healthz address: %v", err)
+	}
+	if err := updateDeprecatedInsecureServingOptionsFromAddress(o.Metrics, componentConfig.MetricsBindAddress); err != nil {
+		return fmt.Errorf("invalid metrics address: %v", err)
+	}
 
 	return o.applyTo(c, componentConfig)
 }
 
-func updateAddressFromDeprecatedInsecureServingOptions(addr *string, is *apiserveroptions.DeprecatedInsecureServingOptionsWithLoopback) {
+func updateAddressFromDeprecatedInsecureServingOptions(addr *string, is *apiserveroptions.DeprecatedInsecureServingOptionsWithLoopback) error {
 	if is == nil {
 		*addr = ""
-		return
+	} else {
+		if is.Listener != nil {
+			*addr = is.Listener.Addr().String()
+		} else if is.BindPort == 0 {
+			*addr = ""
+		} else {
+			*addr = net.JoinHostPort(is.BindAddress.String(), strconv.Itoa(is.BindPort))
+		}
 	}
 
-	if is.Listener != nil {
-		*addr = is.Listener.Addr().String()
-	} else if is.BindPort == 0 {
-		*addr = ""
-	} else {
-		*addr = net.JoinHostPort(is.BindAddress.String(), strconv.Itoa(is.BindPort))
-	}
+	return nil
 }
 
-func updateDeprecatedInsecureServingOptionsFromAddress(is *apiserveroptions.DeprecatedInsecureServingOptionsWithLoopback, addr string) {
+func updateDeprecatedInsecureServingOptionsFromAddress(is *apiserveroptions.DeprecatedInsecureServingOptionsWithLoopback, addr string) error {
 	if is == nil {
-		return
+		return nil
 	}
-
 	if len(addr) == 0 {
 		is.BindPort = 0
-	} else {
-		// In the previous `validate` process, we can ensure that the `addr` is legal, so ignore the error
-		host, portInt, _ := splitHostIntPort(addr)
-		is.BindAddress = net.ParseIP(host)
-		is.BindPort = portInt
+		return nil
 	}
+
+	host, portInt, err := splitHostIntPort(addr)
+	if err != nil {
+		return fmt.Errorf("invalid address %q", addr)
+	}
+
+	is.BindAddress = net.ParseIP(host)
+	is.BindPort = portInt
+
+	return nil
 }
 
 // Validate validates the insecure serving options.

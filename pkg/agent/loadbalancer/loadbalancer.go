@@ -8,10 +8,12 @@ import (
 	"path/filepath"
 	"strconv"
 	"sync"
+	"syscall"
 
+	"github.com/google/tcpproxy"
 	"github.com/rancher/k3s/pkg/version"
 	"github.com/sirupsen/logrus"
-	"inet.af/tcpproxy"
+	"golang.org/x/sys/unix"
 )
 
 type LoadBalancer struct {
@@ -154,6 +156,12 @@ func (lb *LoadBalancer) dialContext(ctx context.Context, network, address string
 func onDialError(src net.Conn, dstDialErr error) {
 	logrus.Debugf("Incoming conn %v, error dialing load balancer servers: %v", src.RemoteAddr().String(), dstDialErr)
 	src.Close()
+}
+
+func reusePort(network, address string, conn syscall.RawConn) error {
+	return conn.Control(func(descriptor uintptr) {
+		syscall.SetsockoptInt(int(descriptor), unix.SOL_SOCKET, unix.SO_REUSEPORT, 1)
+	})
 }
 
 // ResetLoadBalancer will delete the local state file for the load balacner on disk

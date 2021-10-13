@@ -87,7 +87,7 @@ type OIDCAuthenticationOptions struct {
 type ServiceAccountAuthenticationOptions struct {
 	KeyFiles         []string
 	Lookup           bool
-	Issuers          []string
+	Issuer           string
 	JWKSURI          string
 	MaxExpiration    time.Duration
 	ExtendExpiration bool
@@ -185,35 +185,20 @@ func (o *BuiltInAuthenticationOptions) WithWebHook() *BuiltInAuthenticationOptio
 
 // Validate checks invalid config combination
 func (o *BuiltInAuthenticationOptions) Validate() []error {
-	var allErrors []error
+	allErrors := []error{}
 
 	if o.OIDC != nil && (len(o.OIDC.IssuerURL) > 0) != (len(o.OIDC.ClientID) > 0) {
 		allErrors = append(allErrors, fmt.Errorf("oidc-issuer-url and oidc-client-id should be specified together"))
 	}
 
-	if o.ServiceAccounts != nil && len(o.ServiceAccounts.Issuers) > 0 {
-		seen := make(map[string]bool)
-		for _, issuer := range o.ServiceAccounts.Issuers {
-			if strings.Contains(issuer, ":") {
-				if _, err := url.Parse(issuer); err != nil {
-					allErrors = append(allErrors, fmt.Errorf("service-account-issuer %q contained a ':' but was not a valid URL: %v", issuer, err))
-					continue
-				}
-			}
-			if issuer == "" {
-				allErrors = append(allErrors, fmt.Errorf("service-account-issuer should not be an empty string"))
-				continue
-			}
-			if seen[issuer] {
-				allErrors = append(allErrors, fmt.Errorf("service-account-issuer %q is already specified", issuer))
-				continue
-			}
-			seen[issuer] = true
+	if o.ServiceAccounts != nil && len(o.ServiceAccounts.Issuer) > 0 && strings.Contains(o.ServiceAccounts.Issuer, ":") {
+		if _, err := url.Parse(o.ServiceAccounts.Issuer); err != nil {
+			allErrors = append(allErrors, fmt.Errorf("service-account-issuer contained a ':' but was not a valid URL: %v", err))
 		}
 	}
 
 	if o.ServiceAccounts != nil {
-		if len(o.ServiceAccounts.Issuers) == 0 {
+		if len(o.ServiceAccounts.Issuer) == 0 {
 			allErrors = append(allErrors, errors.New("service-account-issuer is a required flag"))
 		}
 		if len(o.ServiceAccounts.KeyFiles) == 0 {
@@ -234,7 +219,7 @@ func (o *BuiltInAuthenticationOptions) Validate() []error {
 	if o.WebHook != nil {
 		retryBackoff := o.WebHook.RetryBackoff
 		if retryBackoff != nil && retryBackoff.Steps <= 0 {
-			allErrors = append(allErrors, fmt.Errorf("number of webhook retry attempts must be greater than 0, but is: %d", retryBackoff.Steps))
+			allErrors = append(allErrors, fmt.Errorf("number of webhook retry attempts must be greater than 1, but is: %d", retryBackoff.Steps))
 		}
 	}
 
@@ -323,7 +308,7 @@ func (o *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 		fs.BoolVar(&o.ServiceAccounts.Lookup, "service-account-lookup", o.ServiceAccounts.Lookup,
 			"If true, validate ServiceAccount tokens exist in etcd as part of authentication.")
 
-		fs.StringArrayVar(&o.ServiceAccounts.Issuers, "service-account-issuer", o.ServiceAccounts.Issuers, ""+
+		fs.StringVar(&o.ServiceAccounts.Issuer, "service-account-issuer", o.ServiceAccounts.Issuer, ""+
 			"Identifier of the service account token issuer. The issuer will assert this identifier "+
 			"in \"iss\" claim of issued tokens. This value is a string or URI. If this option is not "+
 			"a valid URI per the OpenID Discovery 1.0 spec, the ServiceAccountIssuerDiscovery feature "+
@@ -331,9 +316,7 @@ func (o *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 			"that this value comply with the OpenID spec: https://openid.net/specs/openid-connect-discovery-1_0.html. "+
 			"In practice, this means that service-account-issuer must be an https URL. It is also highly "+
 			"recommended that this URL be capable of serving OpenID discovery documents at "+
-			"{service-account-issuer}/.well-known/openid-configuration. "+
-			"When this flag is specified multiple times, the first is used to generate tokens "+
-			"and all are used to determine which issuers are accepted.")
+			"{service-account-issuer}/.well-known/openid-configuration.")
 
 		fs.StringVar(&o.ServiceAccounts.JWKSURI, "service-account-jwks-uri", o.ServiceAccounts.JWKSURI, ""+
 			"Overrides the URI for the JSON Web Key Set in the discovery doc served at "+
@@ -423,11 +406,11 @@ func (o *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticat
 
 	ret.APIAudiences = o.APIAudiences
 	if o.ServiceAccounts != nil {
-		if len(o.ServiceAccounts.Issuers) != 0 && len(o.APIAudiences) == 0 {
-			ret.APIAudiences = authenticator.Audiences(o.ServiceAccounts.Issuers)
+		if o.ServiceAccounts.Issuer != "" && len(o.APIAudiences) == 0 {
+			ret.APIAudiences = authenticator.Audiences{o.ServiceAccounts.Issuer}
 		}
 		ret.ServiceAccountKeyFiles = o.ServiceAccounts.KeyFiles
-		ret.ServiceAccountIssuers = o.ServiceAccounts.Issuers
+		ret.ServiceAccountIssuer = o.ServiceAccounts.Issuer
 		ret.ServiceAccountLookup = o.ServiceAccounts.Lookup
 	}
 
@@ -481,8 +464,8 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(authInfo *genericapiserver.Authen
 	}
 
 	authInfo.APIAudiences = o.APIAudiences
-	if o.ServiceAccounts != nil && len(o.ServiceAccounts.Issuers) != 0 && len(o.APIAudiences) == 0 {
-		authInfo.APIAudiences = authenticator.Audiences(o.ServiceAccounts.Issuers)
+	if o.ServiceAccounts != nil && o.ServiceAccounts.Issuer != "" && len(o.APIAudiences) == 0 {
+		authInfo.APIAudiences = authenticator.Audiences{o.ServiceAccounts.Issuer}
 	}
 
 	authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromClient(

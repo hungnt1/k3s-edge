@@ -31,7 +31,6 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/endpointslicemirroring/metrics"
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
-	endpointsliceutil "k8s.io/kubernetes/pkg/controller/util/endpointslice"
 )
 
 // reconciler is responsible for transforming current EndpointSlice state into
@@ -42,7 +41,7 @@ type reconciler struct {
 	// endpointSliceTracker tracks the list of EndpointSlices and associated
 	// resource versions expected for each Endpoints resource. It can help
 	// determine if a cached EndpointSlice is out of date.
-	endpointSliceTracker *endpointsliceutil.EndpointSliceTracker
+	endpointSliceTracker *endpointSliceTracker
 
 	// eventRecorder allows reconciler to record an event if it finds an invalid
 	// IP address in an Endpoints resource.
@@ -174,7 +173,7 @@ func (r *reconciler) reconcile(endpoints *corev1.Endpoints, existingSlices []*di
 func (r *reconciler) reconcileByPortMapping(
 	endpoints *corev1.Endpoints,
 	existingSlices []*discovery.EndpointSlice,
-	desiredSet endpointsliceutil.EndpointSet,
+	desiredSet endpointSet,
 	endpointPorts []discovery.EndpointPort,
 	addressType discovery.AddressType,
 ) (slicesByAction, totalsByAction) {
@@ -198,8 +197,8 @@ func (r *reconciler) reconcileByPortMapping(
 		// if >0 existing slices, mark all but 1 for deletion.
 		slices.toDelete = existingSlices[1:]
 
-		// generated slices must mirror all endpoints annotations but EndpointsLastChangeTriggerTime and LastAppliedConfigAnnotation
-		compareAnnotations := cloneAndRemoveKeys(endpoints.Annotations, corev1.EndpointsLastChangeTriggerTime, corev1.LastAppliedConfigAnnotation)
+		// generated slices must mirror all endpoints annotations but EndpointsLastChangeTriggerTime
+		compareAnnotations := cloneAndRemoveKeys(endpoints.Annotations, corev1.EndpointsLastChangeTriggerTime)
 		compareLabels := cloneAndRemoveKeys(existingSlices[0].Labels, discovery.LabelManagedBy, discovery.LabelServiceName)
 		// Return early if first slice matches desired endpoints, labels and annotations
 		totals = totalChanges(existingSlices[0], desiredSet)
@@ -289,7 +288,7 @@ func (r *reconciler) deleteEndpoints(namespace, name string, endpointSlices []*d
 		}
 	}
 	if len(errs) > 0 {
-		return fmt.Errorf("error(s) deleting %d/%d EndpointSlices for %s/%s Endpoints, including: %s", len(errs), len(endpointSlices), namespace, name, errs[0])
+		return fmt.Errorf("Error(s) deleting %d/%d EndpointSlices for %s/%s Endpoints, including: %s", len(errs), len(endpointSlices), namespace, name, errs[0])
 	}
 	return nil
 }
@@ -307,7 +306,7 @@ func endpointSlicesByKey(existingSlices []*discovery.EndpointSlice) map[addrType
 
 // totalChanges returns the total changes that will be required for an
 // EndpointSlice to match a desired set of endpoints.
-func totalChanges(existingSlice *discovery.EndpointSlice, desiredSet endpointsliceutil.EndpointSet) totalsByAction {
+func totalChanges(existingSlice *discovery.EndpointSlice, desiredSet endpointSet) totalsByAction {
 	totals := totalsByAction{}
 	existingMatches := 0
 

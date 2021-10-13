@@ -24,12 +24,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	appsv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	appsv1beta2 "k8s.io/kubernetes/pkg/apis/apps/v1beta2"
@@ -48,18 +45,6 @@ type StatefulSetStorage struct {
 	StatefulSet *REST
 	Status      *StatusREST
 	Scale       *ScaleREST
-}
-
-// ReplicasPathMappings returns the mappings between each group version and a replicas path
-func ReplicasPathMappings() fieldmanager.ResourcePathMappings {
-	return replicasPathInStatefulSet
-}
-
-// maps a group version to the replicas path in a statefulset object
-var replicasPathInStatefulSet = fieldmanager.ResourcePathMappings{
-	schema.GroupVersion{Group: "apps", Version: "v1beta1"}.String(): fieldpath.MakePathOrDie("spec", "replicas"),
-	schema.GroupVersion{Group: "apps", Version: "v1beta2"}.String(): fieldpath.MakePathOrDie("spec", "replicas"),
-	schema.GroupVersion{Group: "apps", Version: "v1"}.String():      fieldpath.MakePathOrDie("spec", "replicas"),
 }
 
 // NewStorage returns new instance of StatefulSetStorage.
@@ -280,32 +265,11 @@ func (i *scaleUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runti
 		return nil, errors.NewNotFound(apps.Resource("statefulsets/scale"), i.name)
 	}
 
-	groupVersion := schema.GroupVersion{Group: "apps", Version: "v1"}
-	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
-		requestGroupVersion := schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
-		if _, ok := replicasPathInStatefulSet[requestGroupVersion.String()]; ok {
-			groupVersion = requestGroupVersion
-		} else {
-			klog.Fatal("Unrecognized group/version in request info %q", requestGroupVersion.String())
-		}
-	}
-
-	managedFieldsHandler := fieldmanager.NewScaleHandler(
-		statefulset.ManagedFields,
-		groupVersion,
-		replicasPathInStatefulSet,
-	)
-
 	// statefulset -> old scale
 	oldScale, err := scaleFromStatefulSet(statefulset)
 	if err != nil {
 		return nil, err
 	}
-	scaleManagedFields, err := managedFieldsHandler.ToSubresource()
-	if err != nil {
-		return nil, err
-	}
-	oldScale.ManagedFields = scaleManagedFields
 
 	// old scale -> new scale
 	newScaleObj, err := i.reqObjInfo.UpdatedObject(ctx, oldScale)
@@ -337,12 +301,5 @@ func (i *scaleUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runti
 	// move replicas/resourceVersion fields to object and return
 	statefulset.Spec.Replicas = scale.Spec.Replicas
 	statefulset.ResourceVersion = scale.ResourceVersion
-
-	updatedEntries, err := managedFieldsHandler.ToParent(scale.ManagedFields)
-	if err != nil {
-		return nil, err
-	}
-	statefulset.ManagedFields = updatedEntries
-
 	return statefulset, nil
 }

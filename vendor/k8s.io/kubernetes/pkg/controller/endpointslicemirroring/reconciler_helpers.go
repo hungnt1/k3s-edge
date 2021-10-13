@@ -19,7 +19,6 @@ package endpointslicemirroring
 import (
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
-	endpointsliceutil "k8s.io/kubernetes/pkg/controller/util/endpointslice"
 )
 
 // slicesByAction includes lists of slices to create, update, or delete.
@@ -50,7 +49,7 @@ func (t *totalsByAction) add(totals totalsByAction) {
 func newDesiredCalc() *desiredCalc {
 	return &desiredCalc{
 		portsByKey:          map[addrTypePortMapKey][]discovery.EndpointPort{},
-		endpointsByKey:      map[addrTypePortMapKey]endpointsliceutil.EndpointSet{},
+		endpointsByKey:      map[addrTypePortMapKey]endpointSet{},
 		numDesiredEndpoints: 0,
 	}
 }
@@ -58,7 +57,7 @@ func newDesiredCalc() *desiredCalc {
 // desiredCalc helps calculate desired endpoints and ports.
 type desiredCalc struct {
 	portsByKey          map[addrTypePortMapKey][]discovery.EndpointPort
-	endpointsByKey      map[addrTypePortMapKey]endpointsliceutil.EndpointSet
+	endpointsByKey      map[addrTypePortMapKey]endpointSet
 	numDesiredEndpoints int
 }
 
@@ -76,7 +75,7 @@ func (d *desiredCalc) initPorts(subsetPorts []v1.EndpointPort) multiAddrTypePort
 	for _, addrType := range addrTypes {
 		multiKey[addrType] = newAddrTypePortMapKey(endpointPorts, addrType)
 		if _, ok := d.endpointsByKey[multiKey[addrType]]; !ok {
-			d.endpointsByKey[multiKey[addrType]] = endpointsliceutil.EndpointSet{}
+			d.endpointsByKey[multiKey[addrType]] = endpointSet{}
 		}
 		d.portsByKey[multiKey[addrType]] = endpointPorts
 	}

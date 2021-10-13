@@ -224,13 +224,9 @@ func (j *jwtTokenGenerator) GenerateToken(claims *jwt.Claims, privateClaims inte
 // JWTTokenAuthenticator authenticates tokens as JWT tokens produced by JWTTokenGenerator
 // Token signatures are verified using each of the given public keys until one works (allowing key rotation)
 // If lookup is true, the service account and secret referenced as claims inside the token are retrieved and verified with the provided ServiceAccountTokenGetter
-func JWTTokenAuthenticator(issuers []string, keys []interface{}, implicitAuds authenticator.Audiences, validator Validator) authenticator.Token {
-	issuersMap := make(map[string]bool)
-	for _, issuer := range issuers {
-		issuersMap[issuer] = true
-	}
+func JWTTokenAuthenticator(iss string, keys []interface{}, implicitAuds authenticator.Audiences, validator Validator) authenticator.Token {
 	return &jwtTokenAuthenticator{
-		issuers:      issuersMap,
+		iss:          iss,
 		keys:         keys,
 		implicitAuds: implicitAuds,
 		validator:    validator,
@@ -238,7 +234,7 @@ func JWTTokenAuthenticator(issuers []string, keys []interface{}, implicitAuds au
 }
 
 type jwtTokenAuthenticator struct {
-	issuers      map[string]bool
+	iss          string
 	keys         []interface{}
 	validator    Validator
 	implicitAuds authenticator.Audiences
@@ -344,5 +340,9 @@ func (j *jwtTokenAuthenticator) hasCorrectIssuer(tokenData string) bool {
 	if err := json.Unmarshal(payload, &claims); err != nil {
 		return false
 	}
-	return j.issuers[claims.Issuer]
+	if claims.Issuer != j.iss {
+		return false
+	}
+	return true
+
 }

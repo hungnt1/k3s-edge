@@ -108,9 +108,6 @@ type ManagerImpl struct {
 	// devicesToReuse contains devices that can be reused as they have been allocated to
 	// init containers.
 	devicesToReuse PodReusableDevices
-
-	// pendingAdmissionPod contain the pod during the admission phase
-	pendingAdmissionPod *v1.Pod
 }
 
 type endpointInfo struct {
@@ -370,10 +367,6 @@ func (m *ManagerImpl) isVersionCompatibleWithPlugin(versions []string) bool {
 // Allocate is the call that you can use to allocate a set of devices
 // from the registered device plugins.
 func (m *ManagerImpl) Allocate(pod *v1.Pod, container *v1.Container) error {
-	// The pod is during the admission phase. We need to save the pod to avoid it
-	// being cleaned before the admission ended
-	m.setPodPendingAdmission(pod)
-
 	if _, ok := m.devicesToReuse[string(pod.UID)]; !ok {
 		m.devicesToReuse[string(pod.UID)] = make(map[string]sets.String)
 	}
@@ -626,20 +619,14 @@ func (m *ManagerImpl) readCheckpoint() error {
 
 // UpdateAllocatedDevices frees any Devices that are bound to terminated pods.
 func (m *ManagerImpl) UpdateAllocatedDevices() {
+	activePods := m.activePods()
 	if !m.sourcesReady.AllReady() {
 		return
 	}
-
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-
-	activeAndAdmittedPods := m.activePods()
-	if m.pendingAdmissionPod != nil {
-		activeAndAdmittedPods = append(activeAndAdmittedPods, m.pendingAdmissionPod)
-	}
-
 	podsToBeRemoved := m.podDevices.pods()
-	for _, pod := range activeAndAdmittedPods {
+	for _, pod := range activePods {
 		podsToBeRemoved.Delete(string(pod.UID))
 	}
 	if len(podsToBeRemoved) <= 0 {
@@ -804,33 +791,9 @@ func (m *ManagerImpl) filterByAffinity(podUID, contName, resource string, availa
 		nodes = append(nodes, node)
 	}
 
-	// Sort the list of nodes by:
-	// 1) Nodes contained in the 'hint's affinity set
-	// 2) Nodes not contained in the 'hint's affinity set
-	// 3) The fake NUMANode of -1 (assuming it is included in the list)
-	// Within each of the groups above, sort the nodes by how many devices they contain
+	// Sort the list of nodes by how many devices they contain.
 	sort.Slice(nodes, func(i, j int) bool {
-		// If one or the other of nodes[i] or nodes[j] is in the 'hint's affinity set
-		if hint.NUMANodeAffinity.IsSet(nodes[i]) && hint.NUMANodeAffinity.IsSet(nodes[j]) {
-			return perNodeDevices[nodes[i]].Len() < perNodeDevices[nodes[j]].Len()
-		}
-		if hint.NUMANodeAffinity.IsSet(nodes[i]) {
-			return true
-		}
-		if hint.NUMANodeAffinity.IsSet(nodes[j]) {
-			return false
-		}
-
-		// If one or the other of nodes[i] or nodes[j] is the fake NUMA node -1 (they can't both be)
-		if nodes[i] == nodeWithoutTopology {
-			return false
-		}
-		if nodes[j] == nodeWithoutTopology {
-			return true
-		}
-
-		// Otherwise both nodes[i] and nodes[j] are real NUMA nodes that are not in the 'hint's' affinity list.
-		return perNodeDevices[nodes[i]].Len() < perNodeDevices[nodes[j]].Len()
+		return perNodeDevices[i].Len() < perNodeDevices[j].Len()
 	})
 
 	// Generate three sorted lists of devices. Devices in the first list come
@@ -1108,7 +1071,7 @@ func (m *ManagerImpl) GetAllocatableDevices() ResourceDeviceInstances {
 	m.mutex.Lock()
 	resp := m.allDevices.Clone()
 	m.mutex.Unlock()
-	klog.V(4).InfoS("Known devices", "numDevices", len(resp))
+	klog.V(4).InfoS("known devices", "numDevices", len(resp))
 	return resp
 }
 
@@ -1129,11 +1092,4 @@ func (m *ManagerImpl) ShouldResetExtendedResourceCapacity() bool {
 		return len(checkpoints) == 0
 	}
 	return false
-}
-
-func (m *ManagerImpl) setPodPendingAdmission(pod *v1.Pod) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	m.pendingAdmissionPod = pod
 }

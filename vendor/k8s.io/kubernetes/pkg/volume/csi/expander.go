@@ -143,5 +143,8 @@ func inUseError(err error) bool {
 	// if this is a failed precondition error then that means driver does not support expansion
 	// of in-use volumes
 	// More info - https://github.com/container-storage-interface/spec/blob/master/spec.md#controllerexpandvolume-errors
-	return st.Code() == codes.FailedPrecondition
+	if st.Code() == codes.FailedPrecondition {
+		return true
+	}
+	return false
 }

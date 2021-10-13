@@ -18,16 +18,15 @@ import (
 	"net"
 	"sync"
 
-	"github.com/flannel-io/flannel/subnet"
 	"golang.org/x/net/context"
+
+	"github.com/flannel-io/flannel/subnet"
 )
 
 type ExternalInterface struct {
-	Iface       *net.Interface
-	IfaceAddr   net.IP
-	IfaceV6Addr net.IP
-	ExtAddr     net.IP
-	ExtV6Addr   net.IP
+	Iface     *net.Interface
+	IfaceAddr net.IP
+	ExtAddr   net.IP
 }
 
 // Besides the entry points in the Backend interface, the backend's New()

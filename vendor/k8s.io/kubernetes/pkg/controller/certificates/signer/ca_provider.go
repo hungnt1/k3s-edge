@@ -21,6 +21,7 @@ import (
 	"crypto"
 	"fmt"
 	"sync/atomic"
+	"time"
 
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/client-go/util/cert"
@@ -76,6 +77,7 @@ func (p *caProvider) setCA() error {
 
 		Certificate: certs[0],
 		PrivateKey:  priv,
+		Backdate:    5 * time.Minute,
 	}
 	p.caValue.Store(ca)
 

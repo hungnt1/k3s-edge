@@ -192,10 +192,10 @@ func ListenAndServeKubeletReadOnlyServer(host HostInterface, resourceAnalyzer st
 }
 
 // ListenAndServePodResources initializes a gRPC server to serve the PodResources service
-func ListenAndServePodResources(socket string, podsProvider podresources.PodsProvider, devicesProvider podresources.DevicesProvider, cpusProvider podresources.CPUsProvider, memoryProvider podresources.MemoryProvider) {
+func ListenAndServePodResources(socket string, podsProvider podresources.PodsProvider, devicesProvider podresources.DevicesProvider, cpusProvider podresources.CPUsProvider) {
 	server := grpc.NewServer()
 	podresourcesapiv1alpha1.RegisterPodResourcesListerServer(server, podresources.NewV1alpha1PodResourcesServer(podsProvider, devicesProvider))
-	podresourcesapi.RegisterPodResourcesListerServer(server, podresources.NewV1PodResourcesServer(podsProvider, devicesProvider, cpusProvider, memoryProvider))
+	podresourcesapi.RegisterPodResourcesListerServer(server, podresources.NewV1PodResourcesServer(podsProvider, devicesProvider, cpusProvider))
 	l, err := util.CreateListener(socket)
 	if err != nil {
 		klog.ErrorS(err, "Failed to create listener for podResources endpoint")

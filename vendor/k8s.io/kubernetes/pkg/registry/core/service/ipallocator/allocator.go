@@ -35,7 +35,8 @@ type Interface interface {
 	Release(net.IP) error
 	ForEach(func(net.IP))
 	CIDR() net.IPNet
-	IPFamily() api.IPFamily
+
+	// For testing
 	Has(ip net.IP) bool
 }
 
@@ -75,8 +76,6 @@ type Range struct {
 	base *big.Int
 	// max is the maximum size of the usable addresses in the range
 	max int
-	// family is the IP family of this range
-	family api.IPFamily
 
 	alloc allocator.Interface
 }
@@ -86,16 +85,13 @@ func NewAllocatorCIDRRange(cidr *net.IPNet, allocatorFactory allocator.Allocator
 	max := utilnet.RangeSize(cidr)
 	base := utilnet.BigForIP(cidr.IP)
 	rangeSpec := cidr.String()
-	var family api.IPFamily
 
 	if utilnet.IsIPv6CIDR(cidr) {
-		family = api.IPv6Protocol
 		// Limit the max size, since the allocator keeps a bitmap of that size.
 		if max > 65536 {
 			max = 65536
 		}
 	} else {
-		family = api.IPv4Protocol
 		// Don't use the IPv4 network's broadcast address.
 		max--
 	}
@@ -105,10 +101,9 @@ func NewAllocatorCIDRRange(cidr *net.IPNet, allocatorFactory allocator.Allocator
 	max--
 
 	r := Range{
-		net:    cidr,
-		base:   base,
-		max:    maximum(0, int(max)),
-		family: family,
+		net:  cidr,
+		base: base,
+		max:  maximum(0, int(max)),
 	}
 	var err error
 	r.alloc, err = allocatorFactory(r.max, rangeSpec)
@@ -222,11 +217,6 @@ func (r *Range) Has(ip net.IP) bool {
 	}
 
 	return r.alloc.Has(offset)
-}
-
-// IPFamily returns the IP family of this range.
-func (r *Range) IPFamily() api.IPFamily {
-	return r.family
 }
 
 // Snapshot saves the current state of the pool.

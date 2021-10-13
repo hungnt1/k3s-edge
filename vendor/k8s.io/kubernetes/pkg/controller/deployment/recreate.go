@@ -18,7 +18,7 @@ package deployment
 
 import (
 	apps "k8s.io/api/apps/v1"
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
@@ -110,9 +110,7 @@ func oldPodsRunning(newRS *apps.ReplicaSet, oldRSs []*apps.ReplicaSet, podMap ma
 				// Don't count pods in terminal state.
 				continue
 			case v1.PodUnknown:
-				// v1.PodUnknown is a deprecated status.
-				// This logic is kept for backward compatibility.
-				// This used to happen in situation like when the node is temporarily disconnected from the cluster.
+				// This happens in situation like when the node is temporarily disconnected from the cluster.
 				// If we can't be sure that the pod is not running, we have to count it.
 				return true
 			default:

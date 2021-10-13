@@ -38,33 +38,23 @@ func (Embedded) Bootstrap(ctx context.Context, nodeConfig *daemonconfig.Node, cf
 	return nil
 }
 
-func (Embedded) Kubelet(ctx context.Context, args []string) error {
+func (Embedded) Kubelet(args []string) error {
 	command := kubelet.NewKubeletCommand(context.Background())
 	command.SetArgs(args)
 
 	go func() {
-		defer func() {
-			if err := recover(); err != nil {
-				logrus.Fatalf("kubelet panic: %v", err)
-			}
-		}()
-		logrus.Fatalf("kubelet exited: %v", command.ExecuteContext(ctx))
+		logrus.Fatalf("kubelet exited: %v", command.Execute())
 	}()
 
 	return nil
 }
 
-func (Embedded) KubeProxy(ctx context.Context, args []string) error {
+func (Embedded) KubeProxy(args []string) error {
 	command := proxy.NewProxyCommand()
 	command.SetArgs(args)
 
 	go func() {
-		defer func() {
-			if err := recover(); err != nil {
-				logrus.Fatalf("kube-proxy panic: %v", err)
-			}
-		}()
-		logrus.Fatalf("kube-proxy exited: %v", command.ExecuteContext(ctx))
+		logrus.Fatalf("kube-proxy exited: %v", command.Execute())
 	}()
 
 	return nil
@@ -76,53 +66,38 @@ func (Embedded) APIServer(ctx context.Context, etcdReady <-chan struct{}, args [
 	command.SetArgs(args)
 
 	go func() {
-		defer func() {
-			if err := recover(); err != nil {
-				logrus.Fatalf("apiserver panic: %v", err)
-			}
-		}()
-		logrus.Fatalf("apiserver exited: %v", command.ExecuteContext(ctx))
+		logrus.Fatalf("apiserver exited: %v", command.Execute())
 	}()
 
 	startupConfig := <-app.StartupConfig
 	return startupConfig.Authenticator, startupConfig.Handler, nil
 }
 
-func (Embedded) Scheduler(ctx context.Context, apiReady <-chan struct{}, args []string) error {
+func (Embedded) Scheduler(apiReady <-chan struct{}, args []string) error {
 	command := sapp.NewSchedulerCommand()
 	command.SetArgs(args)
 
 	go func() {
 		<-apiReady
-		defer func() {
-			if err := recover(); err != nil {
-				logrus.Fatalf("scheduler panic: %v", err)
-			}
-		}()
-		logrus.Fatalf("scheduler exited: %v", command.ExecuteContext(ctx))
+		logrus.Fatalf("scheduler exited: %v", command.Execute())
 	}()
 
 	return nil
 }
 
-func (Embedded) ControllerManager(ctx context.Context, apiReady <-chan struct{}, args []string) error {
+func (Embedded) ControllerManager(apiReady <-chan struct{}, args []string) error {
 	command := cmapp.NewControllerManagerCommand()
 	command.SetArgs(args)
 
 	go func() {
 		<-apiReady
-		defer func() {
-			if err := recover(); err != nil {
-				logrus.Fatalf("controller-manager panic: %v", err)
-			}
-		}()
-		logrus.Fatalf("controller-manager exited: %v", command.ExecuteContext(ctx))
+		logrus.Fatalf("controller-manager exited: %v", command.Execute())
 	}()
 
 	return nil
 }
 
-func (Embedded) CloudControllerManager(ctx context.Context, ccmRBACReady <-chan struct{}, args []string) error {
+func (Embedded) CloudControllerManager(ccmRBACReady <-chan struct{}, args []string) error {
 	ccmOptions, err := ccmopt.NewCloudControllerManagerOptions()
 	if err != nil {
 		logrus.Fatalf("unable to initialize command options: %v", err)
@@ -154,12 +129,7 @@ func (Embedded) CloudControllerManager(ctx context.Context, ccmRBACReady <-chan 
 
 	go func() {
 		<-ccmRBACReady
-		defer func() {
-			if err := recover(); err != nil {
-				logrus.Fatalf("cloud-controller-manager panic: %v", err)
-			}
-		}()
-		logrus.Errorf("cloud-controller-manager exited: %v", command.ExecuteContext(ctx))
+		logrus.Fatalf("cloud-controller-manager exited: %v", command.Execute())
 	}()
 
 	return nil

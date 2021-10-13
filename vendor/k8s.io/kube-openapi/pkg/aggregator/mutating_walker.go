@@ -19,7 +19,7 @@ package aggregator
 import (
 	_ "net/http/pprof"
 
-	"k8s.io/kube-openapi/pkg/validation/spec"
+	"github.com/go-openapi/spec"
 )
 
 // Run a walkRefCallback method on all references of an OpenAPI spec, replacing the values.

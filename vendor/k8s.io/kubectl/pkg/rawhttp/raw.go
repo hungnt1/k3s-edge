@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -49,21 +50,20 @@ func RawDelete(restClient *rest.RESTClient, streams genericclioptions.IOStreams,
 
 // raw makes a simple HTTP request to the provided path on the server using the default credentials.
 func raw(restClient *rest.RESTClient, streams genericclioptions.IOStreams, url, filename, requestType string) error {
-	var data io.Reader
+	var data io.ReadCloser
 	switch {
 	case len(filename) == 0:
-		data = bytes.NewBuffer([]byte{})
+		data = ioutil.NopCloser(bytes.NewBuffer([]byte{}))
 
 	case filename == "-":
-		data = streams.In
+		data = ioutil.NopCloser(streams.In)
 
 	default:
-		f, err := os.Open(filename)
+		var err error
+		data, err = os.Open(filename)
 		if err != nil {
 			return err
 		}
-		defer f.Close()
-		data = f
 	}
 
 	var request *rest.Request

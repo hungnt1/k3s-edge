@@ -15,7 +15,6 @@ import (
 	"github.com/rancher/k3s/pkg/daemons/config"
 	"github.com/rancher/k3s/pkg/etcd"
 	"github.com/rancher/k3s/pkg/server"
-	util2 "github.com/rancher/k3s/pkg/util"
 	"github.com/rancher/wrangler/pkg/signals"
 	"github.com/urfave/cli"
 )
@@ -49,7 +48,6 @@ func commandSetup(app *cli.Context, cfg *cmds.Server, sc *server.Config) (string
 	sc.ControlConfig.EtcdS3BucketName = cfg.EtcdS3BucketName
 	sc.ControlConfig.EtcdS3Region = cfg.EtcdS3Region
 	sc.ControlConfig.EtcdS3Folder = cfg.EtcdS3Folder
-	sc.ControlConfig.EtcdS3Insecure = cfg.EtcdS3Insecure
 	sc.ControlConfig.Runtime = &config.ControlRuntime{}
 
 	return server.ResolveDataDir(cfg.DataDir)
@@ -71,7 +69,7 @@ func run(app *cli.Context, cfg *cmds.Server) error {
 	}
 
 	if len(app.Args()) > 0 {
-		return util2.ErrCommandNoArgs
+		return cmds.ErrCommandNoArgs
 	}
 
 	serverConfig.ControlConfig.DataDir = dataDir

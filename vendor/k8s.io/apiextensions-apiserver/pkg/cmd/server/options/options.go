@@ -111,7 +111,7 @@ func (o CustomResourceDefinitionsServerOptions) Config() (*apiserver.Config, err
 		ExtraConfig: apiserver.ExtraConfig{
 			CRDRESTOptionsGetter: NewCRDRESTOptionsGetter(*o.RecommendedOptions.Etcd),
 			ServiceResolver:      &serviceResolver{serverConfig.SharedInformerFactory.Core().V1().Services().Lister()},
-			AuthResolverWrapper:  webhook.NewDefaultAuthenticationInfoResolverWrapper(nil, nil, serverConfig.LoopbackClientConfig, nil),
+			AuthResolverWrapper:  webhook.NewDefaultAuthenticationInfoResolverWrapper(nil, nil, serverConfig.LoopbackClientConfig),
 		},
 	}
 	return config, nil

@@ -134,9 +134,6 @@ func (strategy svcStrategy) Validate(ctx context.Context, obj runtime.Object) fi
 	return allErrs
 }
 
-// WarningsOnCreate returns warnings for the creation of the given object.
-func (svcStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
-
 // Canonicalize normalizes the object after validation.
 func (svcStrategy) Canonicalize(obj runtime.Object) {
 }
@@ -149,11 +146,6 @@ func (strategy svcStrategy) ValidateUpdate(ctx context.Context, obj, old runtime
 	allErrs := validation.ValidateServiceUpdate(obj.(*api.Service), old.(*api.Service))
 	allErrs = append(allErrs, validation.ValidateConditionalService(obj.(*api.Service), old.(*api.Service))...)
 	return allErrs
-}
-
-// WarningsOnUpdate returns warnings for the given update.
-func (svcStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return nil
 }
 
 func (svcStrategy) AllowUnconditionalUpdate() bool {
@@ -172,6 +164,11 @@ func dropServiceDisabledFields(newSvc *api.Service, oldSvc *api.Service) {
 		if len(newSvc.Spec.ClusterIPs) > 1 {
 			newSvc.Spec.ClusterIPs = newSvc.Spec.ClusterIPs[0:1]
 		}
+	}
+
+	// Drop TopologyKeys if ServiceTopology is not enabled
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceTopology) && !topologyKeysInUse(oldSvc) {
+		newSvc.Spec.TopologyKeys = nil
 	}
 
 	// Clear AllocateLoadBalancerNodePorts if ServiceLBNodePortControl is not enabled
@@ -226,6 +223,14 @@ func serviceDualStackFieldsInUse(svc *api.Service) bool {
 	ClusterIPsInUse := len(svc.Spec.ClusterIPs) > 1
 
 	return ipFamilyPolicyInUse || ipFamiliesInUse || ClusterIPsInUse
+}
+
+// returns true if svc.Spec.TopologyKeys field is in use
+func topologyKeysInUse(svc *api.Service) bool {
+	if svc == nil {
+		return false
+	}
+	return len(svc.Spec.TopologyKeys) > 0
 }
 
 // returns true when the svc.Status.Conditions field is in use.

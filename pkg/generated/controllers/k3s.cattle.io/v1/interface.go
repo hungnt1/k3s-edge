@@ -20,29 +20,30 @@ package v1
 
 import (
 	v1 "github.com/rancher/k3s/pkg/apis/k3s.cattle.io/v1"
-	"github.com/rancher/lasso/pkg/controller"
-	"github.com/rancher/wrangler/pkg/schemes"
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	clientset "github.com/rancher/k3s/pkg/generated/clientset/versioned/typed/k3s.cattle.io/v1"
+	informers "github.com/rancher/k3s/pkg/generated/informers/externalversions/k3s.cattle.io/v1"
+	"github.com/rancher/wrangler/pkg/generic"
 )
-
-func init() {
-	schemes.Register(v1.AddToScheme)
-}
 
 type Interface interface {
 	Addon() AddonController
 }
 
-func New(controllerFactory controller.SharedControllerFactory) Interface {
+func New(controllerManager *generic.ControllerManager, client clientset.K3sV1Interface,
+	informers informers.Interface) Interface {
 	return &version{
-		controllerFactory: controllerFactory,
+		controllerManager: controllerManager,
+		client:            client,
+		informers:         informers,
 	}
 }
 
 type version struct {
-	controllerFactory controller.SharedControllerFactory
+	controllerManager *generic.ControllerManager
+	informers         informers.Interface
+	client            clientset.K3sV1Interface
 }
 
 func (c *version) Addon() AddonController {
-	return NewAddonController(schema.GroupVersionKind{Group: "k3s.cattle.io", Version: "v1", Kind: "Addon"}, "addons", true, c.controllerFactory)
+	return NewAddonController(v1.SchemeGroupVersion.WithKind("Addon"), c.controllerManager, c.client, c.informers.Addons())
 }

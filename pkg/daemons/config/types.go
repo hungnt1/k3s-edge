@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/k3s-io/kine/pkg/endpoint"
-	"github.com/rancher/wrangler/pkg/generated/controllers/core"
+	"github.com/rancher/wrangler-api/pkg/generated/controllers/core"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 )
@@ -36,7 +36,7 @@ type Node struct {
 	Containerd               Containerd
 	Images                   string
 	AgentConfig              Agent
-	Token                    string
+	CACerts                  []byte
 	Certificate              *tls.Certificate
 	ServerHTTPSPort          int
 }
@@ -76,7 +76,6 @@ type Agent struct {
 	NodeExternalIP          string
 	NodeExternalIPs         []net.IP
 	RuntimeSocket           string
-	ImageServiceSocket      string
 	ListenAddress           string
 	ClientCA                string
 	CNIBinDir               string
@@ -97,6 +96,7 @@ type Agent struct {
 	AirgapExtraRegistry     []string
 	DisableCCM              bool
 	DisableNPC              bool
+	DisableKubeProxy        bool
 	Rootless                bool
 	ProtectKernelDefaults   bool
 }
@@ -140,7 +140,6 @@ type Control struct {
 	SystemDefaultRegistry    string
 	DisableCCM               bool
 	DisableNPC               bool
-	DisableHelmController    bool
 	DisableKubeProxy         bool
 	DisableAPIServer         bool
 	DisableControllerManager bool
@@ -167,8 +166,6 @@ type Control struct {
 	EtcdS3BucketName         string
 	EtcdS3Region             string
 	EtcdS3Folder             string
-	EtcdS3Insecure           bool
-	ServerNodeName           string
 
 	BindAddress string
 	SANs        []string
@@ -261,13 +258,10 @@ func (a ArgString) String() string {
 	return b.String()
 }
 
-// GetArgs appends extra arguments to existing arguments overriding any default options.
-func GetArgs(argsMap map[string]string, extraArgs []string) []string {
-	const hyphens = "--"
-
+func GetArgsList(argsMap map[string]string, extraArgs []string) []string {
 	// add extra args to args map to override any default option
 	for _, arg := range extraArgs {
-		splitArg := strings.SplitN(strings.TrimPrefix(arg, hyphens), "=", 2)
+		splitArg := strings.SplitN(arg, "=", 2)
 		if len(splitArg) < 2 {
 			argsMap[splitArg[0]] = "true"
 			continue
@@ -276,7 +270,7 @@ func GetArgs(argsMap map[string]string, extraArgs []string) []string {
 	}
 	var args []string
 	for arg, value := range argsMap {
-		cmd := fmt.Sprintf("%s%s=%s", hyphens, strings.TrimPrefix(arg, hyphens), value)
+		cmd := fmt.Sprintf("--%s=%s", arg, value)
 		args = append(args, cmd)
 	}
 	sort.Strings(args)

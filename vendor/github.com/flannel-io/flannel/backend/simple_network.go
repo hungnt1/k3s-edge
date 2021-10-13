@@ -15,8 +15,9 @@
 package backend
 
 import (
-	"github.com/flannel-io/flannel/subnet"
 	"golang.org/x/net/context"
+
+	"github.com/flannel-io/flannel/subnet"
 )
 
 type SimpleNetwork struct {

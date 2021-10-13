@@ -29,6 +29,7 @@ const (
 
 	usageEnforce     = "enforce_tls"
 	usageSkipAllowed = "skip_tls_allowed"
+	usageSkipDenied  = "skip_tls_denied"
 )
 
 var (

@@ -27,7 +27,6 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
-	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -83,12 +82,12 @@ func NewCmdRolloutHistory(f cmdutil.Factory, streams genericclioptions.IOStreams
 		Short:                 i18n.T("View rollout history"),
 		Long:                  historyLong,
 		Example:               historyExample,
-		ValidArgsFunction:     util.SpecifiedResourceTypeAndNameCompletionFunc(f, validArgs),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
+		ValidArgs: validArgs,
 	}
 
 	cmd.Flags().Int64Var(&o.Revision, "revision", o.Revision, "See the details, including podTemplate of the revision specified")

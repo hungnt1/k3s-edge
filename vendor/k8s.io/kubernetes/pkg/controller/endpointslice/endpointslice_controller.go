@@ -45,7 +45,6 @@ import (
 	endpointslicemetrics "k8s.io/kubernetes/pkg/controller/endpointslice/metrics"
 	"k8s.io/kubernetes/pkg/controller/endpointslice/topologycache"
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
-	endpointsliceutil "k8s.io/kubernetes/pkg/controller/util/endpointslice"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -142,7 +141,7 @@ func NewController(podInformer coreinformers.PodInformer,
 
 	c.endpointSliceLister = endpointSliceInformer.Lister()
 	c.endpointSlicesSynced = endpointSliceInformer.Informer().HasSynced
-	c.endpointSliceTracker = endpointsliceutil.NewEndpointSliceTracker()
+	c.endpointSliceTracker = newEndpointSliceTracker()
 
 	c.maxEndpointsPerSlice = maxEndpointsPerSlice
 
@@ -205,7 +204,7 @@ type Controller struct {
 	// endpointSliceTracker tracks the list of EndpointSlices and associated
 	// resource versions expected for each Service. It can help determine if a
 	// cached EndpointSlice is out of date.
-	endpointSliceTracker *endpointsliceutil.EndpointSliceTracker
+	endpointSliceTracker *endpointSliceTracker
 
 	// nodeLister is able to list/get nodes and is populated by the
 	// shared informer passed to NewController
@@ -369,7 +368,7 @@ func (c *Controller) syncService(key string) error {
 	}
 
 	if c.endpointSliceTracker.StaleSlices(service, endpointSlices) {
-		return endpointsliceutil.NewStaleInformerCache("EndpointSlice informer cache is out of date")
+		return &StaleInformerCache{"EndpointSlice informer cache is out of date"}
 	}
 
 	// We call ComputeEndpointLastChangeTriggerTime here to make sure that the
@@ -551,7 +550,7 @@ func (c *Controller) checkNodeTopologyDistribution() {
 func trackSync(err error) {
 	metricLabel := "success"
 	if err != nil {
-		if endpointsliceutil.IsStaleInformerCacheErr(err) {
+		if isStaleInformerCacheErr(err) {
 			metricLabel = "stale"
 		} else {
 			metricLabel = "error"

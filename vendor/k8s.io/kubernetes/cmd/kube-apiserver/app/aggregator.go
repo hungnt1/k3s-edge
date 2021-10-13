@@ -33,10 +33,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/features"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	"k8s.io/apiserver/pkg/util/feature"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	kubeexternalinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
@@ -83,7 +85,7 @@ func createAggregatorConfig(
 		&genericConfig,
 		externalInformers,
 		genericConfig.LoopbackClientConfig,
-		utilfeature.DefaultFeatureGate,
+		feature.DefaultFeatureGate,
 		pluginInitializers...)
 	if err != nil {
 		return nil, err
@@ -91,7 +93,7 @@ func createAggregatorConfig(
 
 	// copy the etcd options so we don't mutate originals.
 	etcdOptions := *commandOptions.Etcd
-	etcdOptions.StorageConfig.Paging = utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIListChunking)
+	etcdOptions.StorageConfig.Paging = utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
 	etcdOptions.StorageConfig.Codec = aggregatorscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion, v1beta1.SchemeGroupVersion)
 	etcdOptions.StorageConfig.EncodeVersioner = runtime.NewMultiGroupVersioner(v1.SchemeGroupVersion, schema.GroupKind{Group: v1beta1.GroupName})
 	genericConfig.RESTOptionsGetter = &genericoptions.SimpleRestOptionsFactory{Options: etcdOptions}

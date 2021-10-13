@@ -23,6 +23,7 @@ import (
 	"github.com/spf13/cobra"
 
 	batchv1 "k8s.io/api/batch/v1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -44,10 +45,10 @@ var (
 		# Create a job
 		kubectl create job my-job --image=busybox
 
-		# Create a job with a command
+		# Create a job with command
 		kubectl create job my-job --image=busybox -- date
 
-		# Create a job from a cron job named "a-cronjob"
+		# Create a job from a CronJob named "a-cronjob"
 		kubectl create job test-job --from=cronjob/a-cronjob`))
 )
 
@@ -88,7 +89,7 @@ func NewCmdCreateJob(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *
 	cmd := &cobra.Command{
 		Use:                   "job NAME --image=image [--from=cronjob/name] -- [COMMAND] [args...]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Create a job with the specified name"),
+		Short:                 jobLong,
 		Long:                  jobLong,
 		Example:               jobExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -193,6 +194,8 @@ func (o *CreateJobOptions) Run() error {
 		switch obj := infos[0].Object.(type) {
 		case *batchv1.CronJob:
 			job = o.createJobFromCronJob(obj)
+		case *batchv1beta1.CronJob:
+			job = o.createJobFromCronJobV1Beta1(obj)
 		default:
 			return fmt.Errorf("unknown object type %T", obj)
 		}
@@ -251,6 +254,38 @@ func (o *CreateJobOptions) createJob() *batchv1.Job {
 	return job
 }
 
+func (o *CreateJobOptions) createJobFromCronJobV1Beta1(cronJob *batchv1beta1.CronJob) *batchv1.Job {
+	annotations := make(map[string]string)
+	annotations["cronjob.kubernetes.io/instantiate"] = "manual"
+	for k, v := range cronJob.Spec.JobTemplate.Annotations {
+		annotations[k] = v
+	}
+
+	job := &batchv1.Job{
+		// this is ok because we know exactly how we want to be serialized
+		TypeMeta: metav1.TypeMeta{APIVersion: batchv1.SchemeGroupVersion.String(), Kind: "Job"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        o.Name,
+			Annotations: annotations,
+			Labels:      cronJob.Spec.JobTemplate.Labels,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					// TODO (soltysh): switch this to v1 in v1.22, when n-1 skew will be fulfilled
+					APIVersion: batchv1beta1.SchemeGroupVersion.String(),
+					Kind:       "CronJob",
+					Name:       cronJob.GetName(),
+					UID:        cronJob.GetUID(),
+				},
+			},
+		},
+		Spec: cronJob.Spec.JobTemplate.Spec,
+	}
+	if o.EnforceNamespace {
+		job.Namespace = o.Namespace
+	}
+	return job
+}
+
 func (o *CreateJobOptions) createJobFromCronJob(cronJob *batchv1.CronJob) *batchv1.Job {
 	annotations := make(map[string]string)
 	annotations["cronjob.kubernetes.io/instantiate"] = "manual"
@@ -267,7 +302,7 @@ func (o *CreateJobOptions) createJobFromCronJob(cronJob *batchv1.CronJob) *batch
 			Labels:      cronJob.Spec.JobTemplate.Labels,
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion: batchv1.SchemeGroupVersion.String(),
+					APIVersion: batchv1beta1.SchemeGroupVersion.String(),
 					Kind:       "CronJob",
 					Name:       cronJob.GetName(),
 					UID:        cronJob.GetUID(),

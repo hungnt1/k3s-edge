@@ -119,9 +119,6 @@ func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorLis
 	return validation.ValidateCustomResourceDefinition(obj.(*apiextensions.CustomResourceDefinition), groupVersion)
 }
 
-// WarningsOnCreate returns warnings for the creation of the given object.
-func (strategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
-
 // AllowCreateOnUpdate is false for CustomResourceDefinition; this means a POST is
 // needed to create one.
 func (strategy) AllowCreateOnUpdate() bool {
@@ -145,11 +142,6 @@ func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) fie
 	}
 
 	return validation.ValidateCustomResourceDefinitionUpdate(obj.(*apiextensions.CustomResourceDefinition), old.(*apiextensions.CustomResourceDefinition), groupVersion)
-}
-
-// WarningsOnUpdate returns warnings for the given update.
-func (strategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return nil
 }
 
 type statusStrategy struct {
@@ -204,11 +196,6 @@ func (statusStrategy) Canonicalize(obj runtime.Object) {
 
 func (statusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateUpdateCustomResourceDefinitionStatus(obj.(*apiextensions.CustomResourceDefinition), old.(*apiextensions.CustomResourceDefinition))
-}
-
-// WarningsOnUpdate returns warnings for the given update.
-func (statusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return nil
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.

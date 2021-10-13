@@ -24,7 +24,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
@@ -168,7 +170,7 @@ func (cache *schedulerCache) removeNodeInfoFromList(name string) {
 	delete(cache.nodes, name)
 }
 
-// Dump produces a dump of the current scheduler cache. This is used for
+// Snapshot takes a snapshot of the current scheduler cache. This is used for
 // debugging purposes only and shouldn't be confused with UpdateSnapshot
 // function.
 // This method is expensive, and should be only used in non-critical path.
@@ -196,6 +198,7 @@ func (cache *schedulerCache) Dump() *Dump {
 func (cache *schedulerCache) UpdateSnapshot(nodeSnapshot *Snapshot) error {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
+	balancedVolumesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes)
 
 	// Get the last generation of the snapshot.
 	snapshotGeneration := nodeSnapshot.generation
@@ -218,6 +221,10 @@ func (cache *schedulerCache) UpdateSnapshot(nodeSnapshot *Snapshot) error {
 		if node.info.Generation <= snapshotGeneration {
 			// all the nodes are updated before the existing snapshot. We are done.
 			break
+		}
+		if balancedVolumesEnabled && node.info.TransientInfo != nil {
+			// Transient scheduler info is reset here.
+			node.info.TransientInfo.ResetTransientSchedulerInfo()
 		}
 		if np := node.info.Node(); np != nil {
 			existing, ok := nodeSnapshot.nodeInfoMap[np.Name]
@@ -586,7 +593,7 @@ func (cache *schedulerCache) GetPod(pod *v1.Pod) (*v1.Pod, error) {
 	return podState.pod, nil
 }
 
-func (cache *schedulerCache) AddNode(node *v1.Node) *framework.NodeInfo {
+func (cache *schedulerCache) AddNode(node *v1.Node) error {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 
@@ -601,11 +608,10 @@ func (cache *schedulerCache) AddNode(node *v1.Node) *framework.NodeInfo {
 
 	cache.nodeTree.addNode(node)
 	cache.addNodeImageStates(node, n.info)
-	n.info.SetNode(node)
-	return n.info.Clone()
+	return n.info.SetNode(node)
 }
 
-func (cache *schedulerCache) UpdateNode(oldNode, newNode *v1.Node) *framework.NodeInfo {
+func (cache *schedulerCache) UpdateNode(oldNode, newNode *v1.Node) error {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 
@@ -621,8 +627,7 @@ func (cache *schedulerCache) UpdateNode(oldNode, newNode *v1.Node) *framework.No
 
 	cache.nodeTree.updateNode(oldNode, newNode)
 	cache.addNodeImageStates(newNode, n.info)
-	n.info.SetNode(newNode)
-	return n.info.Clone()
+	return n.info.SetNode(newNode)
 }
 
 // RemoveNode removes a node from the cache's tree.

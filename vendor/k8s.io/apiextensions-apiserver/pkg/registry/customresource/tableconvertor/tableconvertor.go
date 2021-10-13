@@ -21,7 +21,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"reflect"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -70,14 +69,9 @@ func New(crdColumns []apiextensionsv1.CustomResourceColumnDefinition) (rest.Tabl
 	return c, nil
 }
 
-type columnPrinter interface {
-	FindResults(data interface{}) ([][]reflect.Value, error)
-	PrintResults(w io.Writer, results []reflect.Value) error
-}
-
 type convertor struct {
 	headers           []metav1.TableColumnDefinition
-	additionalColumns []columnPrinter
+	additionalColumns []*jsonpath.JSONPath
 }
 
 func (c *convertor) ConvertToTable(ctx context.Context, obj runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {

@@ -7,10 +7,10 @@ import (
 	"strconv"
 
 	"github.com/rancher/k3s/pkg/version"
+	appclient "github.com/rancher/wrangler-api/pkg/generated/controllers/apps/v1"
+	coreclient "github.com/rancher/wrangler-api/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/condition"
-	appclient "github.com/rancher/wrangler/pkg/generated/controllers/apps/v1"
-	coreclient "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/pkg/objectset"
 	"github.com/rancher/wrangler/pkg/relatedresource"
 	"github.com/rancher/wrangler/pkg/slice"
@@ -25,7 +25,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	v1getter "k8s.io/client-go/kubernetes/typed/apps/v1"
 	coregetter "k8s.io/client-go/kubernetes/typed/core/v1"
-	utilpointer "k8s.io/utils/pointer"
 )
 
 var (
@@ -327,9 +326,6 @@ func (h *handler) newDaemonSet(svc *core.Service) (*apps.DaemonSet, error) {
 						"app":        name,
 						svcNameLabel: svc.Name,
 					},
-				},
-				Spec: core.PodSpec{
-					AutomountServiceAccountToken: utilpointer.Bool(false),
 				},
 			},
 			UpdateStrategy: apps.DaemonSetUpdateStrategy{

@@ -3,7 +3,7 @@ package cluster
 import (
 	"context"
 	"crypto/tls"
-	"errors"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -18,7 +18,7 @@ import (
 	"github.com/rancher/k3s/pkg/daemons/config"
 	"github.com/rancher/k3s/pkg/etcd"
 	"github.com/rancher/k3s/pkg/version"
-	"github.com/rancher/wrangler/pkg/generated/controllers/core"
+	"github.com/rancher/wrangler-api/pkg/generated/controllers/core"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -79,16 +79,17 @@ func (c *Cluster) initClusterAndHTTPS(ctx context.Context) error {
 
 	// Create a HTTP server with the registered request handlers, using logrus for logging
 	server := http.Server{
-		Handler:  handler,
-		ErrorLog: log.New(logrus.StandardLogger().Writer(), "Cluster-Http-Server ", log.LstdFlags),
+		Handler: handler}
+	if logrus.IsLevelEnabled(logrus.DebugLevel) {
+		server.ErrorLog = log.New(logrus.StandardLogger().Writer(), "Cluster-Http-Server ", log.LstdFlags)
+	} else {
+		server.ErrorLog = log.New(ioutil.Discard, "Cluster-Http-Server", 0)
 	}
 
 	// Start the supervisor http server on the tls listener
 	go func() {
 		err := server.Serve(listener)
-		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logrus.Fatalf("server stopped: %v", err)
-		}
+		logrus.Fatalf("server stopped: %v", err)
 	}()
 
 	// Shutdown the http server when the context is closed

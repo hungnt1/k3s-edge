@@ -63,9 +63,12 @@ func (c *ELBV2) AddListenerCertificatesRequest(input *AddListenerCertificatesInp
 // If the certificate in already in the certificate list, the call is successful
 // but the certificate is not added again.
 //
-// For more information, see HTTPS listeners (https://docs.aws.amazon.com/elasticloadbalancing/latest/application/create-https-listener.html)
-// in the Application Load Balancers Guide or TLS listeners (https://docs.aws.amazon.com/elasticloadbalancing/latest/network/create-tls-listener.html)
-// in the Network Load Balancers Guide.
+// To get the certificate list for a listener, use DescribeListenerCertificates.
+// To remove certificates from the certificate list for a listener, use RemoveListenerCertificates.
+// To replace the default certificate for a listener, use ModifyListener.
+//
+// For more information, see SSL Certificates (https://docs.aws.amazon.com/elasticloadbalancing/latest/application/create-https-listener.html#https-listener-certificates)
+// in the Application Load Balancers Guide.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -152,11 +155,14 @@ func (c *ELBV2) AddTagsRequest(input *AddTagsInput) (req *request.Request, outpu
 // AddTags API operation for Elastic Load Balancing.
 //
 // Adds the specified tags to the specified Elastic Load Balancing resource.
-// You can tag your Application Load Balancers, Network Load Balancers, Gateway
-// Load Balancers, target groups, listeners, and rules.
+// You can tag your Application Load Balancers, Network Load Balancers, target
+// groups, listeners, and rules.
 //
 // Each tag consists of a key and an optional value. If a resource already has
 // a tag with the same key, AddTags updates its value.
+//
+// To list the current tags for your resources, use DescribeTags. To remove
+// tags from your resources, use RemoveTags.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -244,20 +250,21 @@ func (c *ELBV2) CreateListenerRequest(input *CreateListenerInput) (req *request.
 
 // CreateListener API operation for Elastic Load Balancing.
 //
-// Creates a listener for the specified Application Load Balancer, Network Load
-// Balancer, or Gateway Load Balancer.
+// Creates a listener for the specified Application Load Balancer or Network
+// Load Balancer.
 //
-// For more information, see the following:
-//
-//    * Listeners for your Application Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-listeners.html)
-//
-//    * Listeners for your Network Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/network/load-balancer-listeners.html)
-//
-//    * Listeners for your Gateway Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/gateway/gateway-listeners.html)
+// To update a listener, use ModifyListener. When you are finished with a listener,
+// you can delete it using DeleteListener. If you are finished with both the
+// listener and the load balancer, you can delete them both using DeleteLoadBalancer.
 //
 // This operation is idempotent, which means that it completes at most one time.
 // If you attempt to create multiple listeners with the same settings, each
 // call succeeds.
+//
+// For more information, see Listeners for Your Application Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-listeners.html)
+// in the Application Load Balancers Guide and Listeners for Your Network Load
+// Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/network/load-balancer-listeners.html)
+// in the Network Load Balancers Guide.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -390,20 +397,28 @@ func (c *ELBV2) CreateLoadBalancerRequest(input *CreateLoadBalancerInput) (req *
 
 // CreateLoadBalancer API operation for Elastic Load Balancing.
 //
-// Creates an Application Load Balancer, Network Load Balancer, or Gateway Load
-// Balancer.
+// Creates an Application Load Balancer or a Network Load Balancer.
 //
-// For more information, see the following:
+// When you create a load balancer, you can specify security groups, public
+// subnets, IP address type, and tags. Otherwise, you could do so later using
+// SetSecurityGroups, SetSubnets, SetIpAddressType, and AddTags.
 //
-//    * Application Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html)
+// To create listeners for your load balancer, use CreateListener. To describe
+// your current load balancers, see DescribeLoadBalancers. When you are finished
+// with a load balancer, you can delete it using DeleteLoadBalancer.
 //
-//    * Network Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/network/network-load-balancers.html)
-//
-//    * Gateway Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/gateway/gateway-load-balancers.html)
+// For limit information, see Limits for Your Application Load Balancer (https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-limits.html)
+// in the Application Load Balancers Guide and Limits for Your Network Load
+// Balancer (https://docs.aws.amazon.com/elasticloadbalancing/latest/network/load-balancer-limits.html)
+// in the Network Load Balancers Guide.
 //
 // This operation is idempotent, which means that it completes at most one time.
 // If you attempt to create multiple load balancers with the same settings,
 // each call succeeds.
+//
+// For more information, see Application Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html)
+// in the Application Load Balancers Guide and Network Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/network/network-load-balancers.html)
+// in the Network Load Balancers Guide.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -525,8 +540,12 @@ func (c *ELBV2) CreateRuleRequest(input *CreateRuleInput) (req *request.Request,
 // Rules are evaluated in priority order, from the lowest value to the highest
 // value. When the conditions for a rule are met, its actions are performed.
 // If the conditions for no rules are met, the actions for the default rule
-// are performed. For more information, see Listener rules (https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-listeners.html#listener-rules)
+// are performed. For more information, see Listener Rules (https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-listeners.html#listener-rules)
 // in the Application Load Balancers Guide.
+//
+// To view your current rules, use DescribeRules. To update a rule, use ModifyRule.
+// To set the priorities of your rules, use SetRulePriorities. To delete a rule,
+// use DeleteRule.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -652,17 +671,24 @@ func (c *ELBV2) CreateTargetGroupRequest(input *CreateTargetGroupInput) (req *re
 //
 // Creates a target group.
 //
-// For more information, see the following:
+// To register targets with the target group, use RegisterTargets. To update
+// the health check settings for the target group, use ModifyTargetGroup. To
+// monitor the health of targets in the target group, use DescribeTargetHealth.
 //
-//    * Target groups for your Application Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-target-groups.html)
+// To route traffic to the targets in a target group, specify the target group
+// in an action using CreateListener or CreateRule.
 //
-//    * Target groups for your Network Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/network/load-balancer-target-groups.html)
-//
-//    * Target groups for your Gateway Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/gateway/target-groups.html)
+// To delete a target group, use DeleteTargetGroup.
 //
 // This operation is idempotent, which means that it completes at most one time.
 // If you attempt to create multiple target groups with the same settings, each
 // call succeeds.
+//
+// For more information, see Target Groups for Your Application Load Balancers
+// (https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-target-groups.html)
+// in the Application Load Balancers Guide or Target Groups for Your Network
+// Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/network/load-balancer-target-groups.html)
+// in the Network Load Balancers Guide.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -754,7 +780,7 @@ func (c *ELBV2) DeleteListenerRequest(input *DeleteListenerInput) (req *request.
 // Deletes the specified listener.
 //
 // Alternatively, your listener is deleted when you delete the load balancer
-// to which it is attached.
+// to which it is attached, using DeleteLoadBalancer.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -834,8 +860,8 @@ func (c *ELBV2) DeleteLoadBalancerRequest(input *DeleteLoadBalancerInput) (req *
 
 // DeleteLoadBalancer API operation for Elastic Load Balancing.
 //
-// Deletes the specified Application Load Balancer, Network Load Balancer, or
-// Gateway Load Balancer. Deleting a load balancer also deletes its listeners.
+// Deletes the specified Application Load Balancer or Network Load Balancer
+// and its attached listeners.
 //
 // You can't delete a load balancer if deletion protection is enabled. If the
 // load balancer does not exist or has already been deleted, the call succeeds.
@@ -1017,9 +1043,7 @@ func (c *ELBV2) DeleteTargetGroupRequest(input *DeleteTargetGroupInput) (req *re
 // Deletes the specified target group.
 //
 // You can delete a target group if it is not referenced by any actions. Deleting
-// a target group also deletes any associated health checks. Deleting a target
-// group does not affect its registered targets. For example, any EC2 instances
-// continue to run until you stop or terminate them.
+// a target group also deletes any associated health checks.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -1187,13 +1211,10 @@ func (c *ELBV2) DescribeAccountLimitsRequest(input *DescribeAccountLimitsInput) 
 // Describes the current Elastic Load Balancing resource limits for your AWS
 // account.
 //
-// For more information, see the following:
-//
-//    * Quotas for your Application Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-limits.html)
-//
-//    * Quotas for your Network Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/network/load-balancer-limits.html)
-//
-//    * Quotas for your Gateway Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/gateway/quotas-limits.html)
+// For more information, see Limits for Your Application Load Balancers (https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-limits.html)
+// in the Application Load Balancer Guide or Limits for Your Network Load Balancers
+// (https://docs.aws.amazon.com/elasticloadbalancing/latest/network/load-balancer-limits.html)
+// in the Network Load Balancers Guide.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -1274,9 +1295,8 @@ func (c *ELBV2) DescribeListenerCertificatesRequest(input *DescribeListenerCerti
 // in the results (once with IsDefault set to true and once with IsDefault set
 // to false).
 //
-// For more information, see SSL certificates (https://docs.aws.amazon.com/elasticloadbalancing/latest/application/create-https-listener.html#https-listener-certificates)
-// in the Application Load Balancers Guide or Server certificates (https://docs.aws.amazon.com/elasticloadbalancing/latest/network/create-tls-listener.html#tls-listener-certificate)
-// in the Network Load Balancers Guide.
+// For more information, see SSL Certificates (https://docs.aws.amazon.com/elasticloadbalancing/latest/application/create-https-listener.html#https-listener-certificates)
+// in the Application Load Balancers Guide.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -1362,8 +1382,12 @@ func (c *ELBV2) DescribeListenersRequest(input *DescribeListenersInput) (req *re
 // DescribeListeners API operation for Elastic Load Balancing.
 //
 // Describes the specified listeners or the listeners for the specified Application
-// Load Balancer, Network Load Balancer, or Gateway Load Balancer. You must
-// specify either a load balancer or one or more listeners.
+// Load Balancer or Network Load Balancer. You must specify either a load balancer
+// or one or more listeners.
+//
+// For an HTTPS or TLS listener, the output includes the default certificate
+// for the listener. To describe the certificate list for the listener, use
+// DescribeListenerCertificates.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -1500,19 +1524,12 @@ func (c *ELBV2) DescribeLoadBalancerAttributesRequest(input *DescribeLoadBalance
 
 // DescribeLoadBalancerAttributes API operation for Elastic Load Balancing.
 //
-// Describes the attributes for the specified Application Load Balancer, Network
-// Load Balancer, or Gateway Load Balancer.
+// Describes the attributes for the specified Application Load Balancer or Network
+// Load Balancer.
 //
-// For more information, see the following:
-//
-//    * Load balancer attributes (https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html#load-balancer-attributes)
-//    in the Application Load Balancers Guide
-//
-//    * Load balancer attributes (https://docs.aws.amazon.com/elasticloadbalancing/latest/network/network-load-balancers.html#load-balancer-attributes)
-//    in the Network Load Balancers Guide
-//
-//    * Load balancer attributes (https://docs.aws.amazon.com/elasticloadbalancing/latest/gateway/gateway-load-balancers.html#load-balancer-attributes)
-//    in the Gateway Load Balancers Guide
+// For more information, see Load Balancer Attributes (https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html#load-balancer-attributes)
+// in the Application Load Balancers Guide or Load Balancer Attributes (https://docs.aws.amazon.com/elasticloadbalancing/latest/network/network-load-balancers.html#load-balancer-attributes)
+// in the Network Load Balancers Guide.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -1598,6 +1615,9 @@ func (c *ELBV2) DescribeLoadBalancersRequest(input *DescribeLoadBalancersInput) 
 // DescribeLoadBalancers API operation for Elastic Load Balancing.
 //
 // Describes the specified load balancers or all of your load balancers.
+//
+// To describe the listeners for a load balancer, use DescribeListeners. To
+// describe the attributes for a load balancer, use DescribeLoadBalancerAttributes.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -1816,9 +1836,8 @@ func (c *ELBV2) DescribeSSLPoliciesRequest(input *DescribeSSLPoliciesInput) (req
 //
 // Describes the specified policies or all policies used for SSL negotiation.
 //
-// For more information, see Security policies (https://docs.aws.amazon.com/elasticloadbalancing/latest/application/create-https-listener.html#describe-ssl-policies)
-// in the Application Load Balancers Guide or Security policies (https://docs.aws.amazon.com/elasticloadbalancing/latest/network/create-tls-listener.html#describe-ssl-policies)
-// in the Network Load Balancers Guide.
+// For more information, see Security Policies (https://docs.aws.amazon.com/elasticloadbalancing/latest/application/create-https-listener.html#describe-ssl-policies)
+// in the Application Load Balancers Guide.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -1899,7 +1918,7 @@ func (c *ELBV2) DescribeTagsRequest(input *DescribeTagsInput) (req *request.Requ
 //
 // Describes the tags for the specified Elastic Load Balancing resources. You
 // can describe the tags for one or more Application Load Balancers, Network
-// Load Balancers, Gateway Load Balancers, target groups, listeners, or rules.
+// Load Balancers, target groups, listeners, or rules.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -1989,16 +2008,9 @@ func (c *ELBV2) DescribeTargetGroupAttributesRequest(input *DescribeTargetGroupA
 //
 // Describes the attributes for the specified target group.
 //
-// For more information, see the following:
-//
-//    * Target group attributes (https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-target-groups.html#target-group-attributes)
-//    in the Application Load Balancers Guide
-//
-//    * Target group attributes (https://docs.aws.amazon.com/elasticloadbalancing/latest/network/load-balancer-target-groups.html#target-group-attributes)
-//    in the Network Load Balancers Guide
-//
-//    * Target group attributes (https://docs.aws.amazon.com/elasticloadbalancing/latest/gateway/target-groups.html#target-group-attributes)
-//    in the Gateway Load Balancers Guide
+// For more information, see Target Group Attributes (https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-target-groups.html#target-group-attributes)
+// in the Application Load Balancers Guide or Target Group Attributes (https://docs.aws.amazon.com/elasticloadbalancing/latest/network/load-balancer-target-groups.html#target-group-attributes)
+// in the Network Load Balancers Guide.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -2087,6 +2099,9 @@ func (c *ELBV2) DescribeTargetGroupsRequest(input *DescribeTargetGroupsInput) (r
 // all target groups are described. Alternatively, you can specify one of the
 // following to filter the results: the ARN of the load balancer, the names
 // of one or more target groups, or the ARNs of one or more target groups.
+//
+// To describe the targets for a target group, use DescribeTargetHealth. To
+// describe the attributes of a target group, use DescribeTargetGroupAttributes.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -2447,8 +2462,8 @@ func (c *ELBV2) ModifyLoadBalancerAttributesRequest(input *ModifyLoadBalancerAtt
 
 // ModifyLoadBalancerAttributes API operation for Elastic Load Balancing.
 //
-// Modifies the specified attributes of the specified Application Load Balancer,
-// Network Load Balancer, or Gateway Load Balancer.
+// Modifies the specified attributes of the specified Application Load Balancer
+// or Network Load Balancer.
 //
 // If any of the specified attributes can't be modified as requested, the call
 // fails. Any existing attributes that you do not modify retain their current
@@ -2540,6 +2555,8 @@ func (c *ELBV2) ModifyRuleRequest(input *ModifyRuleInput) (req *request.Request,
 // To add an item to a list, remove an item from a list, or update an item in
 // a list, you must provide the entire list. For example, to add an action,
 // specify a list with the current actions plus the new action.
+//
+// To modify the actions for the default rule, use ModifyListener.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -2653,6 +2670,8 @@ func (c *ELBV2) ModifyTargetGroupRequest(input *ModifyTargetGroupInput) (req *re
 //
 // Modifies the health checks used when evaluating the health state of the targets
 // in the specified target group.
+//
+// To monitor the health of the targets, use DescribeTargetHealth.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -2832,6 +2851,8 @@ func (c *ELBV2) RegisterTargetsRequest(input *RegisterTargetsInput) (req *reques
 // G1, G2, HI1, HS1, M1, M2, M3, and T1. You can register instances of these
 // types by IP address.
 //
+// To remove a target from a target group, use DeregisterTargets.
+//
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
 // the error.
@@ -2924,6 +2945,11 @@ func (c *ELBV2) RemoveListenerCertificatesRequest(input *RemoveListenerCertifica
 // Removes the specified certificate from the certificate list for the specified
 // HTTPS or TLS listener.
 //
+// You can't remove the default certificate for a listener. To replace the default
+// certificate, call ModifyListener.
+//
+// To list the certificates for your listener, use DescribeListenerCertificates.
+//
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
 // the error.
@@ -3007,7 +3033,9 @@ func (c *ELBV2) RemoveTagsRequest(input *RemoveTagsInput) (req *request.Request,
 //
 // Removes the specified tags from the specified Elastic Load Balancing resources.
 // You can remove the tags for one or more Application Load Balancers, Network
-// Load Balancers, Gateway Load Balancers, target groups, listeners, or rules.
+// Load Balancers, target groups, listeners, or rules.
+//
+// To list the current tags for your resources, use DescribeTags.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -3277,8 +3305,7 @@ func (c *ELBV2) SetSecurityGroupsRequest(input *SetSecurityGroupsInput) (req *re
 // Balancer. The specified security groups override the previously associated
 // security groups.
 //
-// You can't specify a security group for a Network Load Balancer or Gateway
-// Load Balancer.
+// You can't specify a security group for a Network Load Balancer.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -3364,8 +3391,7 @@ func (c *ELBV2) SetSubnetsRequest(input *SetSubnetsInput) (req *request.Request,
 // SetSubnets API operation for Elastic Load Balancing.
 //
 // Enables the Availability Zones for the specified public subnets for the specified
-// Application Load Balancer or Network Load Balancer. The specified subnets
-// replace the previously enabled subnets.
+// load balancer. The specified subnets replace the previously enabled subnets.
 //
 // When you specify subnets for a Network Load Balancer, you must include all
 // subnets that were enabled previously, with their existing configurations,
@@ -4160,13 +4186,15 @@ type CreateListenerInput struct {
 	//
 	//    * None
 	//
-	// For more information, see ALPN policies (https://docs.aws.amazon.com/elasticloadbalancing/latest/network/create-tls-listener.html#alpn-policies)
+	// For more information, see ALPN Policies (https://docs.aws.amazon.com/elasticloadbalancing/latest/network/create-tls-listener.html#alpn-policies)
 	// in the Network Load Balancers Guide.
 	AlpnPolicy []*string `type:"list"`
 
 	// [HTTPS and TLS listeners] The default certificate for the listener. You must
 	// provide exactly one certificate. Set CertificateArn to the certificate ARN
 	// but do not set IsDefault.
+	//
+	// To create a certificate list for the listener, use AddListenerCertificates.
 	Certificates []*Certificate `type:"list"`
 
 	// The actions for the default rule.
@@ -4179,22 +4207,41 @@ type CreateListenerInput struct {
 	// LoadBalancerArn is a required field
 	LoadBalancerArn *string `type:"string" required:"true"`
 
-	// The port on which the load balancer is listening. You cannot specify a port
-	// for a Gateway Load Balancer.
-	Port *int64 `min:"1" type:"integer"`
+	// The port on which the load balancer is listening.
+	//
+	// Port is a required field
+	Port *int64 `min:"1" type:"integer" required:"true"`
 
 	// The protocol for connections from clients to the load balancer. For Application
 	// Load Balancers, the supported protocols are HTTP and HTTPS. For Network Load
-	// Balancers, the supported protocols are TCP, TLS, UDP, and TCP_UDP. You can’t
-	// specify the UDP or TCP_UDP protocol if dual-stack mode is enabled. You cannot
-	// specify a protocol for a Gateway Load Balancer.
-	Protocol *string `type:"string" enum:"ProtocolEnum"`
+	// Balancers, the supported protocols are TCP, TLS, UDP, and TCP_UDP.
+	//
+	// Protocol is a required field
+	Protocol *string `type:"string" required:"true" enum:"ProtocolEnum"`
 
 	// [HTTPS and TLS listeners] The security policy that defines which protocols
-	// and ciphers are supported.
+	// and ciphers are supported. The following are the possible values:
 	//
-	// For more information, see Security policies (https://docs.aws.amazon.com/elasticloadbalancing/latest/application/create-https-listener.html#describe-ssl-policies)
-	// in the Application Load Balancers Guide and Security policies (https://docs.aws.amazon.com/elasticloadbalancing/latest/network/create-tls-listener.html#describe-ssl-policies)
+	//    * ELBSecurityPolicy-2016-08
+	//
+	//    * ELBSecurityPolicy-TLS-1-0-2015-04
+	//
+	//    * ELBSecurityPolicy-TLS-1-1-2017-01
+	//
+	//    * ELBSecurityPolicy-TLS-1-2-2017-01
+	//
+	//    * ELBSecurityPolicy-TLS-1-2-Ext-2018-06
+	//
+	//    * ELBSecurityPolicy-FS-2018-06
+	//
+	//    * ELBSecurityPolicy-FS-1-1-2019-08
+	//
+	//    * ELBSecurityPolicy-FS-1-2-2019-08
+	//
+	//    * ELBSecurityPolicy-FS-1-2-Res-2019-08
+	//
+	// For more information, see Security Policies (https://docs.aws.amazon.com/elasticloadbalancing/latest/application/create-https-listener.html#describe-ssl-policies)
+	// in the Application Load Balancers Guide and Security Policies (https://docs.aws.amazon.com/elasticloadbalancing/latest/network/create-tls-listener.html#describe-ssl-policies)
 	// in the Network Load Balancers Guide.
 	SslPolicy *string `type:"string"`
 
@@ -4221,8 +4268,14 @@ func (s *CreateListenerInput) Validate() error {
 	if s.LoadBalancerArn == nil {
 		invalidParams.Add(request.NewErrParamRequired("LoadBalancerArn"))
 	}
+	if s.Port == nil {
+		invalidParams.Add(request.NewErrParamRequired("Port"))
+	}
 	if s.Port != nil && *s.Port < 1 {
 		invalidParams.Add(request.NewErrParamMinValue("Port", 1))
+	}
+	if s.Protocol == nil {
+		invalidParams.Add(request.NewErrParamRequired("Protocol"))
 	}
 	if s.Tags != nil && len(s.Tags) < 1 {
 		invalidParams.Add(request.NewErrParamMinLen("Tags", 1))
@@ -4332,9 +4385,10 @@ type CreateLoadBalancerInput struct {
 	// pool (CoIP pool).
 	CustomerOwnedIpv4Pool *string `type:"string"`
 
-	// The type of IP addresses used by the subnets for your load balancer. The
-	// possible values are ipv4 (for IPv4 addresses) and dualstack (for IPv4 and
-	// IPv6 addresses). Internal load balancers must use ipv4.
+	// [Application Load Balancers] The type of IP addresses used by the subnets
+	// for your load balancer. The possible values are ipv4 (for IPv4 addresses)
+	// and dualstack (for IPv4 and IPv6 addresses). Internal load balancers must
+	// use ipv4.
 	IpAddressType *string `type:"string" enum:"IpAddressType"`
 
 	// The name of the load balancer.
@@ -4357,8 +4411,6 @@ type CreateLoadBalancerInput struct {
 	// only from clients with access to the VPC for the load balancer.
 	//
 	// The default is an Internet-facing load balancer.
-	//
-	// You cannot specify a scheme for a Gateway Load Balancer.
 	Scheme *string `type:"string" enum:"LoadBalancerSchemeEnum"`
 
 	// [Application Load Balancers] The IDs of the security groups for the load
@@ -4380,11 +4432,7 @@ type CreateLoadBalancerInput struct {
 	// Zones. You can specify one Elastic IP address per subnet if you need static
 	// IP addresses for your internet-facing load balancer. For internal load balancers,
 	// you can specify one private IP address per subnet from the IPv4 range of
-	// the subnet. For internet-facing load balancer, you can specify one IPv6 address
-	// per subnet.
-	//
-	// [Gateway Load Balancers] You can specify subnets from one or more Availability
-	// Zones. You cannot specify Elastic IP addresses for your subnets.
+	// the subnet.
 	SubnetMappings []*SubnetMapping `type:"list"`
 
 	// The IDs of the public subnets. You can specify only one subnet per Availability
@@ -4399,9 +4447,6 @@ type CreateLoadBalancerInput struct {
 	// one or more Local Zones.
 	//
 	// [Network Load Balancers] You can specify subnets from one or more Availability
-	// Zones.
-	//
-	// [Gateway Load Balancers] You can specify subnets from one or more Availability
 	// Zones.
 	Subnets []*string `type:"list"`
 
@@ -4672,10 +4717,10 @@ type CreateTargetGroupInput struct {
 	HealthCheckEnabled *bool `type:"boolean"`
 
 	// The approximate amount of time, in seconds, between health checks of an individual
-	// target. If the target group protocol is TCP, TLS, UDP, or TCP_UDP, the supported
-	// values are 10 and 30 seconds. If the target group protocol is HTTP or HTTPS,
-	// the default is 30 seconds. If the target group protocol is GENEVE, the default
-	// is 10 seconds. If the target type is lambda, the default is 35 seconds.
+	// target. For HTTP and HTTPS health checks, the range is 5–300 seconds. For
+	// TCP health checks, the supported values are 10 and 30 seconds. If the target
+	// type is instance or ip, the default is 30 seconds. If the target type is
+	// lambda, the default is 35 seconds.
 	HealthCheckIntervalSeconds *int64 `min:"5" type:"integer"`
 
 	// [HTTP/HTTPS health checks] The destination for health checks on the targets.
@@ -4687,30 +4732,29 @@ type CreateTargetGroupInput struct {
 	HealthCheckPath *string `min:"1" type:"string"`
 
 	// The port the load balancer uses when performing health checks on targets.
-	// If the protocol is HTTP, HTTPS, TCP, TLS, UDP, or TCP_UDP, the default is
-	// traffic-port, which is the port on which each target receives traffic from
-	// the load balancer. If the protocol is GENEVE, the default is port 80.
+	// The default is traffic-port, which is the port on which each target receives
+	// traffic from the load balancer.
 	HealthCheckPort *string `type:"string"`
 
 	// The protocol the load balancer uses when performing health checks on targets.
-	// For Application Load Balancers, the default is HTTP. For Network Load Balancers
-	// and Gateway Load Balancers, the default is TCP. The TCP protocol is not supported
-	// for health checks if the protocol of the target group is HTTP or HTTPS. The
-	// GENEVE, TLS, UDP, and TCP_UDP protocols are not supported for health checks.
+	// For Application Load Balancers, the default is HTTP. For Network Load Balancers,
+	// the default is TCP. The TCP protocol is supported for health checks only
+	// if the protocol of the target group is TCP, TLS, UDP, or TCP_UDP. The TLS,
+	// UDP, and TCP_UDP protocols are not supported for health checks.
 	HealthCheckProtocol *string `type:"string" enum:"ProtocolEnum"`
 
 	// The amount of time, in seconds, during which no response from a target means
-	// a failed health check. For target groups with a protocol of HTTP, HTTPS,
-	// or GENEVE, the default is 5 seconds. For target groups with a protocol of
-	// TCP or TLS, this value must be 6 seconds for HTTP health checks and 10 seconds
-	// for TCP and HTTPS health checks. If the target type is lambda, the default
-	// is 30 seconds.
+	// a failed health check. For target groups with a protocol of HTTP or HTTPS,
+	// the default is 5 seconds. For target groups with a protocol of TCP or TLS,
+	// this value must be 6 seconds for HTTP health checks and 10 seconds for TCP
+	// and HTTPS health checks. If the target type is lambda, the default is 30
+	// seconds.
 	HealthCheckTimeoutSeconds *int64 `min:"2" type:"integer"`
 
 	// The number of consecutive health checks successes required before considering
 	// an unhealthy target healthy. For target groups with a protocol of HTTP or
-	// HTTPS, the default is 5. For target groups with a protocol of TCP, TLS, or
-	// GENEVE, the default is 3. If the target type is lambda, the default is 5.
+	// HTTPS, the default is 5. For target groups with a protocol of TCP or TLS,
+	// the default is 3. If the target type is lambda, the default is 5.
 	HealthyThresholdCount *int64 `min:"2" type:"integer"`
 
 	// [HTTP/HTTPS health checks] The HTTP or gRPC codes to use when checking for
@@ -4728,16 +4772,14 @@ type CreateTargetGroupInput struct {
 
 	// The port on which the targets receive traffic. This port is used unless you
 	// specify a port override when registering the target. If the target is a Lambda
-	// function, this parameter does not apply. If the protocol is GENEVE, the supported
-	// port is 6081.
+	// function, this parameter does not apply.
 	Port *int64 `min:"1" type:"integer"`
 
 	// The protocol to use for routing traffic to the targets. For Application Load
 	// Balancers, the supported protocols are HTTP and HTTPS. For Network Load Balancers,
-	// the supported protocols are TCP, TLS, UDP, or TCP_UDP. For Gateway Load Balancers,
-	// the supported protocol is GENEVE. A TCP_UDP listener must be associated with
-	// a TCP_UDP target group. If the target is a Lambda function, this parameter
-	// does not apply.
+	// the supported protocols are TCP, TLS, UDP, or TCP_UDP. A TCP_UDP listener
+	// must be associated with a TCP_UDP target group. If the target is a Lambda
+	// function, this parameter does not apply.
 	Protocol *string `type:"string" enum:"ProtocolEnum"`
 
 	// [HTTP/HTTPS protocol] The protocol version. Specify GRPC to send requests
@@ -4752,22 +4794,23 @@ type CreateTargetGroupInput struct {
 	// target group. You can't specify targets for a target group using more than
 	// one target type.
 	//
-	//    * instance - Register targets by instance ID. This is the default value.
+	//    * instance - Targets are specified by instance ID. This is the default
+	//    value.
 	//
-	//    * ip - Register targets by IP address. You can specify IP addresses from
-	//    the subnets of the virtual private cloud (VPC) for the target group, the
-	//    RFC 1918 range (10.0.0.0/8, 172.16.0.0/12, and 192.168.0.0/16), and the
-	//    RFC 6598 range (100.64.0.0/10). You can't specify publicly routable IP
-	//    addresses.
+	//    * ip - Targets are specified by IP address. You can specify IP addresses
+	//    from the subnets of the virtual private cloud (VPC) for the target group,
+	//    the RFC 1918 range (10.0.0.0/8, 172.16.0.0/12, and 192.168.0.0/16), and
+	//    the RFC 6598 range (100.64.0.0/10). You can't specify publicly routable
+	//    IP addresses.
 	//
-	//    * lambda - Register a single Lambda function as a target.
+	//    * lambda - The target groups contains a single Lambda function.
 	TargetType *string `type:"string" enum:"TargetTypeEnum"`
 
 	// The number of consecutive health check failures required before considering
-	// a target unhealthy. If the target group protocol is HTTP or HTTPS, the default
-	// is 2. If the target group protocol is TCP or TLS, this value must be the
-	// same as the healthy threshold count. If the target group protocol is GENEVE,
-	// the default is 3. If the target type is lambda, the default is 2.
+	// a target unhealthy. For target groups with a protocol of HTTP or HTTPS, the
+	// default is 2. For target groups with a protocol of TCP or TLS, this value
+	// must be the same as the healthy threshold count. If the target type is lambda,
+	// the default is 2.
 	UnhealthyThresholdCount *int64 `min:"2" type:"integer"`
 
 	// The identifier of the virtual private cloud (VPC). If the target is a Lambda
@@ -6376,16 +6419,6 @@ type Limit struct {
 	//
 	//    * application-load-balancers
 	//
-	//    * condition-values-per-alb-rule
-	//
-	//    * condition-wildcards-per-alb-rule
-	//
-	//    * gateway-load-balancers
-	//
-	//    * gateway-load-balancers-per-vpc
-	//
-	//    * geneve-target-groups
-	//
 	//    * listeners-per-application-load-balancer
 	//
 	//    * listeners-per-network-load-balancer
@@ -6403,8 +6436,6 @@ type Limit struct {
 	//    * target-groups-per-application-load-balancer
 	//
 	//    * targets-per-application-load-balancer
-	//
-	//    * targets-per-availability-zone-per-gateway-load-balancer
 	//
 	//    * targets-per-availability-zone-per-network-load-balancer
 	//
@@ -6674,9 +6705,6 @@ type LoadBalancerAddress struct {
 	// an internal-facing load balancer.
 	AllocationId *string `type:"string"`
 
-	// [Network Load Balancers] The IPv6 address.
-	IPv6Address *string `type:"string"`
-
 	// The static IP address.
 	IpAddress *string `type:"string"`
 
@@ -6700,12 +6728,6 @@ func (s *LoadBalancerAddress) SetAllocationId(v string) *LoadBalancerAddress {
 	return s
 }
 
-// SetIPv6Address sets the IPv6Address field's value.
-func (s *LoadBalancerAddress) SetIPv6Address(v string) *LoadBalancerAddress {
-	s.IPv6Address = &v
-	return s
-}
-
 // SetIpAddress sets the IpAddress field's value.
 func (s *LoadBalancerAddress) SetIpAddress(v string) *LoadBalancerAddress {
 	s.IpAddress = &v
@@ -6724,11 +6746,6 @@ type LoadBalancerAttribute struct {
 
 	// The name of the attribute.
 	//
-	// The following attribute is supported by all load balancers:
-	//
-	//    * deletion_protection.enabled - Indicates whether deletion protection
-	//    is enabled. The value is true or false. The default is false.
-	//
 	// The following attributes are supported by both Application Load Balancers
 	// and Network Load Balancers:
 	//
@@ -6742,6 +6759,9 @@ type LoadBalancerAttribute struct {
 	//
 	//    * access_logs.s3.prefix - The prefix for the location in the S3 bucket
 	//    for the access logs.
+	//
+	//    * deletion_protection.enabled - Indicates whether deletion protection
+	//    is enabled. The value is true or false. The default is false.
 	//
 	// The following attributes are supported by only Application Load Balancers:
 	//
@@ -6761,12 +6781,7 @@ type LoadBalancerAttribute struct {
 	//    is true or false. The default is true. Elastic Load Balancing requires
 	//    that message header names contain only alphanumeric characters and hyphens.
 	//
-	//    * waf.fail_open.enabled - Indicates whether to allow a WAF-enabled load
-	//    balancer to route requests to targets if it is unable to forward the request
-	//    to AWS WAF. The value is true or false. The default is false.
-	//
-	// The following attribute is supported by Network Load Balancers and Gateway
-	// Load Balancers:
+	// The following attributes are supported by only Network Load Balancers:
 	//
 	//    * load_balancing.cross_zone.enabled - Indicates whether cross-zone load
 	//    balancing is enabled. The value is true or false. The default is false.
@@ -6804,9 +6819,7 @@ type LoadBalancerState struct {
 
 	// The state code. The initial state of the load balancer is provisioning. After
 	// the load balancer is fully set up and ready to route traffic, its state is
-	// active. If load balancer is routing traffic but does not have the resources
-	// it needs to scale, its state isactive_impaired. If the load balancer could
-	// not be set up, its state is failed.
+	// active. If the load balancer could not be set up, its state is failed.
 	Code *string `type:"string" enum:"LoadBalancerStateEnum"`
 
 	// A description of the state.
@@ -6850,7 +6863,7 @@ type Matcher struct {
 	// and the default value is 200. You can specify multiple values (for example,
 	// "200,202") or a range of values (for example, "200-299").
 	//
-	// For Network Load Balancers and Gateway Load Balancers, this must be "200–399".
+	// For Network Load Balancers, this is "200–399".
 	HttpCode *string `type:"string"`
 }
 
@@ -6892,13 +6905,15 @@ type ModifyListenerInput struct {
 	//
 	//    * None
 	//
-	// For more information, see ALPN policies (https://docs.aws.amazon.com/elasticloadbalancing/latest/network/create-tls-listener.html#alpn-policies)
+	// For more information, see ALPN Policies (https://docs.aws.amazon.com/elasticloadbalancing/latest/network/create-tls-listener.html#alpn-policies)
 	// in the Network Load Balancers Guide.
 	AlpnPolicy []*string `type:"list"`
 
 	// [HTTPS and TLS listeners] The default certificate for the listener. You must
 	// provide exactly one certificate. Set CertificateArn to the certificate ARN
 	// but do not set IsDefault.
+	//
+	// To create a certificate list, use AddListenerCertificates.
 	Certificates []*Certificate `type:"list"`
 
 	// The actions for the default rule.
@@ -6909,22 +6924,37 @@ type ModifyListenerInput struct {
 	// ListenerArn is a required field
 	ListenerArn *string `type:"string" required:"true"`
 
-	// The port for connections from clients to the load balancer. You cannot specify
-	// a port for a Gateway Load Balancer.
+	// The port for connections from clients to the load balancer.
 	Port *int64 `min:"1" type:"integer"`
 
 	// The protocol for connections from clients to the load balancer. Application
 	// Load Balancers support the HTTP and HTTPS protocols. Network Load Balancers
-	// support the TCP, TLS, UDP, and TCP_UDP protocols. You can’t change the
-	// protocol to UDP or TCP_UDP if dual-stack mode is enabled. You cannot specify
-	// a protocol for a Gateway Load Balancer.
+	// support the TCP, TLS, UDP, and TCP_UDP protocols.
 	Protocol *string `type:"string" enum:"ProtocolEnum"`
 
 	// [HTTPS and TLS listeners] The security policy that defines which protocols
-	// and ciphers are supported.
+	// and ciphers are supported. The following are the possible values:
 	//
-	// For more information, see Security policies (https://docs.aws.amazon.com/elasticloadbalancing/latest/application/create-https-listener.html#describe-ssl-policies)
-	// in the Application Load Balancers Guide or Security policies (https://docs.aws.amazon.com/elasticloadbalancing/latest/network/create-tls-listener.html#describe-ssl-policies)
+	//    * ELBSecurityPolicy-2016-08
+	//
+	//    * ELBSecurityPolicy-TLS-1-0-2015-04
+	//
+	//    * ELBSecurityPolicy-TLS-1-1-2017-01
+	//
+	//    * ELBSecurityPolicy-TLS-1-2-2017-01
+	//
+	//    * ELBSecurityPolicy-TLS-1-2-Ext-2018-06
+	//
+	//    * ELBSecurityPolicy-FS-2018-06
+	//
+	//    * ELBSecurityPolicy-FS-1-1-2019-08
+	//
+	//    * ELBSecurityPolicy-FS-1-2-2019-08
+	//
+	//    * ELBSecurityPolicy-FS-1-2-Res-2019-08
+	//
+	// For more information, see Security Policies (https://docs.aws.amazon.com/elasticloadbalancing/latest/application/create-https-listener.html#describe-ssl-policies)
+	// in the Application Load Balancers Guide and Security Policies (https://docs.aws.amazon.com/elasticloadbalancing/latest/network/create-tls-listener.html#describe-ssl-policies)
 	// in the Network Load Balancers Guide.
 	SslPolicy *string `type:"string"`
 }
@@ -7276,7 +7306,8 @@ type ModifyTargetGroupInput struct {
 	HealthCheckEnabled *bool `type:"boolean"`
 
 	// The approximate amount of time, in seconds, between health checks of an individual
-	// target. For TCP health checks, the supported values are 10 or 30 seconds.
+	// target. For HTTP and HTTPS health checks, the range is 5 to 300 seconds.
+	// For TPC health checks, the supported values are 10 or 30 seconds.
 	//
 	// With Network Load Balancers, you can't modify this setting.
 	HealthCheckIntervalSeconds *int64 `min:"5" type:"integer"`
@@ -7294,8 +7325,8 @@ type ModifyTargetGroupInput struct {
 
 	// The protocol the load balancer uses when performing health checks on targets.
 	// The TCP protocol is supported for health checks only if the protocol of the
-	// target group is TCP, TLS, UDP, or TCP_UDP. The GENEVE, TLS, UDP, and TCP_UDP
-	// protocols are not supported for health checks.
+	// target group is TCP, TLS, UDP, or TCP_UDP. The TLS, UDP, and TCP_UDP protocols
+	// are not supported for health checks.
 	//
 	// With Network Load Balancers, you can't modify this setting.
 	HealthCheckProtocol *string `type:"string" enum:"ProtocolEnum"`
@@ -8125,8 +8156,7 @@ type SetIpAddressTypeInput struct {
 
 	// The IP address type. The possible values are ipv4 (for IPv4 addresses) and
 	// dualstack (for IPv4 and IPv6 addresses). Internal load balancers must use
-	// ipv4. You can’t specify dualstack for a load balancer with a UDP or TCP_UDP
-	// listener.
+	// ipv4. Network Load Balancers must use ipv4.
 	//
 	// IpAddressType is a required field
 	IpAddressType *string `type:"string" required:"true" enum:"IpAddressType"`
@@ -8347,13 +8377,6 @@ func (s *SetSecurityGroupsOutput) SetSecurityGroupIds(v []*string) *SetSecurityG
 type SetSubnetsInput struct {
 	_ struct{} `type:"structure"`
 
-	// [Network Load Balancers] The type of IP addresses used by the subnets for
-	// your load balancer. The possible values are ipv4 (for IPv4 addresses) and
-	// dualstack (for IPv4 and IPv6 addresses). You can’t specify dualstack for
-	// a load balancer with a UDP or TCP_UDP listener. Internal load balancers must
-	// use ipv4.
-	IpAddressType *string `type:"string" enum:"IpAddressType"`
-
 	// The Amazon Resource Name (ARN) of the load balancer.
 	//
 	// LoadBalancerArn is a required field
@@ -8365,32 +8388,16 @@ type SetSubnetsInput struct {
 	// [Application Load Balancers] You must specify subnets from at least two Availability
 	// Zones. You cannot specify Elastic IP addresses for your subnets.
 	//
-	// [Application Load Balancers on Outposts] You must specify one Outpost subnet.
-	//
-	// [Application Load Balancers on Local Zones] You can specify subnets from
-	// one or more Local Zones.
-	//
 	// [Network Load Balancers] You can specify subnets from one or more Availability
-	// Zones. You can specify one Elastic IP address per subnet if you need static
-	// IP addresses for your internet-facing load balancer. For internal load balancers,
+	// Zones. If you need static IP addresses for your internet-facing load balancer,
+	// you can specify one Elastic IP address per subnet. For internal load balancers,
 	// you can specify one private IP address per subnet from the IPv4 range of
-	// the subnet. For internet-facing load balancer, you can specify one IPv6 address
-	// per subnet.
+	// the subnet.
 	SubnetMappings []*SubnetMapping `type:"list"`
 
-	// The IDs of the public subnets. You can specify only one subnet per Availability
-	// Zone. You must specify either subnets or subnet mappings.
-	//
-	// [Application Load Balancers] You must specify subnets from at least two Availability
-	// Zones.
-	//
-	// [Application Load Balancers on Outposts] You must specify one Outpost subnet.
-	//
-	// [Application Load Balancers on Local Zones] You can specify subnets from
-	// one or more Local Zones.
-	//
-	// [Network Load Balancers] You can specify subnets from one or more Availability
-	// Zones.
+	// The IDs of the public subnets. You must specify subnets from at least two
+	// Availability Zones. You can specify only one subnet per Availability Zone.
+	// You must specify either subnets or subnet mappings.
 	Subnets []*string `type:"list"`
 }
 
@@ -8417,12 +8424,6 @@ func (s *SetSubnetsInput) Validate() error {
 	return nil
 }
 
-// SetIpAddressType sets the IpAddressType field's value.
-func (s *SetSubnetsInput) SetIpAddressType(v string) *SetSubnetsInput {
-	s.IpAddressType = &v
-	return s
-}
-
 // SetLoadBalancerArn sets the LoadBalancerArn field's value.
 func (s *SetSubnetsInput) SetLoadBalancerArn(v string) *SetSubnetsInput {
 	s.LoadBalancerArn = &v
@@ -8446,9 +8447,6 @@ type SetSubnetsOutput struct {
 
 	// Information about the subnets.
 	AvailabilityZones []*AvailabilityZone `type:"list"`
-
-	// [Network Load Balancers] The IP address type.
-	IpAddressType *string `type:"string" enum:"IpAddressType"`
 }
 
 // String returns the string representation
@@ -8464,12 +8462,6 @@ func (s SetSubnetsOutput) GoString() string {
 // SetAvailabilityZones sets the AvailabilityZones field's value.
 func (s *SetSubnetsOutput) SetAvailabilityZones(v []*AvailabilityZone) *SetSubnetsOutput {
 	s.AvailabilityZones = v
-	return s
-}
-
-// SetIpAddressType sets the IpAddressType field's value.
-func (s *SetSubnetsOutput) SetIpAddressType(v string) *SetSubnetsOutput {
-	s.IpAddressType = &v
 	return s
 }
 
@@ -8557,9 +8549,6 @@ type SubnetMapping struct {
 	// an internet-facing load balancer.
 	AllocationId *string `type:"string"`
 
-	// [Network Load Balancers] The IPv6 address.
-	IPv6Address *string `type:"string"`
-
 	// [Network Load Balancers] The private IPv4 address for an internal load balancer.
 	PrivateIPv4Address *string `type:"string"`
 
@@ -8580,12 +8569,6 @@ func (s SubnetMapping) GoString() string {
 // SetAllocationId sets the AllocationId field's value.
 func (s *SubnetMapping) SetAllocationId(v string) *SubnetMapping {
 	s.AllocationId = &v
-	return s
-}
-
-// SetIPv6Address sets the IPv6Address field's value.
-func (s *SubnetMapping) SetIPv6Address(v string) *SubnetMapping {
-	s.IPv6Address = &v
 	return s
 }
 
@@ -8715,8 +8698,8 @@ type TargetDescription struct {
 	// Id is a required field
 	Id *string `type:"string" required:"true"`
 
-	// The port on which the target is listening. If the target group protocol is
-	// GENEVE, the supported port is 6081. Not used if the target is a Lambda function.
+	// The port on which the target is listening. Not used if the target is a Lambda
+	// function.
 	Port *int64 `min:"1" type:"integer"`
 }
 
@@ -8781,8 +8764,7 @@ type TargetGroup struct {
 	// The port to use to connect with the target.
 	HealthCheckPort *string `type:"string"`
 
-	// The protocol to use to connect with the target. The GENEVE, TLS, UDP, and
-	// TCP_UDP protocols are not supported for health checks.
+	// The protocol to use to connect with the target.
 	HealthCheckProtocol *string `type:"string" enum:"ProtocolEnum"`
 
 	// The amount of time, in seconds, during which no response means a failed health
@@ -8819,9 +8801,8 @@ type TargetGroup struct {
 	TargetGroupName *string `type:"string"`
 
 	// The type of target that you must specify when registering targets with this
-	// target group. The possible values are instance (register targets by instance
-	// ID), ip (register targets by IP address), or lambda (register a single Lambda
-	// function as a target).
+	// target group. The possible values are instance (targets are specified by
+	// instance ID) or ip (targets are specified by IP address).
 	TargetType *string `type:"string" enum:"TargetTypeEnum"`
 
 	// The number of consecutive health check failures required before considering
@@ -8950,7 +8931,8 @@ type TargetGroupAttribute struct {
 
 	// The name of the attribute.
 	//
-	// The following attribute is supported by all load balancers:
+	// The following attributes are supported by both Application Load Balancers
+	// and Network Load Balancers:
 	//
 	//    * deregistration_delay.timeout_seconds - The amount of time, in seconds,
 	//    for Elastic Load Balancing to wait before changing the state of a deregistering
@@ -8958,15 +8940,12 @@ type TargetGroupAttribute struct {
 	//    value is 300 seconds. If the target is a Lambda function, this attribute
 	//    is not supported.
 	//
-	// The following attributes are supported by both Application Load Balancers
-	// and Network Load Balancers:
-	//
 	//    * stickiness.enabled - Indicates whether sticky sessions are enabled.
 	//    The value is true or false. The default is false.
 	//
 	//    * stickiness.type - The type of sticky sessions. The possible values are
-	//    lb_cookie and app_cookie for Application Load Balancers or source_ip for
-	//    Network Load Balancers.
+	//    lb_cookie for Application Load Balancers or source_ip for Network Load
+	//    Balancers.
 	//
 	// The following attributes are supported only if the load balancer is an Application
 	// Load Balancer and the target is an instance or an IP address:
@@ -8980,16 +8959,6 @@ type TargetGroupAttribute struct {
 	//    to the target group. After this time period ends, the target receives
 	//    its full share of traffic. The range is 30-900 seconds (15 minutes). The
 	//    default is 0 seconds (disabled).
-	//
-	//    * stickiness.app_cookie.cookie_name - Indicates the name of the application-based
-	//    cookie. Names that start with the following names are not allowed: AWSALB,
-	//    AWSALBAPP, and AWSALBTG. They're reserved for use by the load balancer.
-	//
-	//    * stickiness.app_cookie.duration_seconds - The time period, in seconds,
-	//    during which requests from a client should be routed to the same target.
-	//    After this time period expires, the application-based cookie is considered
-	//    stale. The range is 1 second to 1 week (604800 seconds). The default value
-	//    is 1 day (86400 seconds).
 	//
 	//    * stickiness.lb_cookie.duration_seconds - The time period, in seconds,
 	//    during which requests from a client should be routed to the same target.
@@ -9007,17 +8976,7 @@ type TargetGroupAttribute struct {
 	//    contains a duplicate header field name or query parameter key, the load
 	//    balancer uses the last value sent by the client.
 	//
-	// The following attributes are supported only by Network Load Balancers:
-	//
-	//    * deregistration_delay.connection_termination.enabled - Indicates whether
-	//    the load balancer terminates connections at the end of the deregistration
-	//    timeout. The value is true or false. The default is false.
-	//
-	//    * preserve_client_ip.enabled - Indicates whether client IP preservation
-	//    is enabled. The value is true or false. The default is disabled if the
-	//    target group type is IP address and the target group protocol is TCP or
-	//    TLS. Otherwise, the default is enabled. Client IP preservation cannot
-	//    be disabled for UDP and TCP_UDP target groups.
+	// The following attribute is supported only by Network Load Balancers:
 	//
 	//    * proxy_protocol_v2.enabled - Indicates whether Proxy Protocol version
 	//    2 is enabled. The value is true or false. The default is false.
@@ -9142,11 +9101,10 @@ type TargetHealth struct {
 	// values:
 	//
 	//    * Target.ResponseCodeMismatch - The health checks did not return an expected
-	//    HTTP code. Applies only to Application Load Balancers and Gateway Load
-	//    Balancers.
+	//    HTTP code. Applies only to Application Load Balancers.
 	//
 	//    * Target.Timeout - The health check requests timed out. Applies only to
-	//    Application Load Balancers and Gateway Load Balancers.
+	//    Application Load Balancers.
 	//
 	//    * Target.FailedHealthChecks - The load balancer received an error while
 	//    establishing a connection to the target or the target response was malformed.
@@ -9388,9 +9346,6 @@ const (
 
 	// LoadBalancerTypeEnumNetwork is a LoadBalancerTypeEnum enum value
 	LoadBalancerTypeEnumNetwork = "network"
-
-	// LoadBalancerTypeEnumGateway is a LoadBalancerTypeEnum enum value
-	LoadBalancerTypeEnumGateway = "gateway"
 )
 
 // LoadBalancerTypeEnum_Values returns all elements of the LoadBalancerTypeEnum enum
@@ -9398,7 +9353,6 @@ func LoadBalancerTypeEnum_Values() []string {
 	return []string{
 		LoadBalancerTypeEnumApplication,
 		LoadBalancerTypeEnumNetwork,
-		LoadBalancerTypeEnumGateway,
 	}
 }
 
@@ -9420,9 +9374,6 @@ const (
 
 	// ProtocolEnumTcpUdp is a ProtocolEnum enum value
 	ProtocolEnumTcpUdp = "TCP_UDP"
-
-	// ProtocolEnumGeneve is a ProtocolEnum enum value
-	ProtocolEnumGeneve = "GENEVE"
 )
 
 // ProtocolEnum_Values returns all elements of the ProtocolEnum enum
@@ -9434,7 +9385,6 @@ func ProtocolEnum_Values() []string {
 		ProtocolEnumTls,
 		ProtocolEnumUdp,
 		ProtocolEnumTcpUdp,
-		ProtocolEnumGeneve,
 	}
 }
 

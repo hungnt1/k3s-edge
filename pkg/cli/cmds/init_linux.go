@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/containerd/containerd/pkg/userns"
+	"github.com/containerd/containerd/sys"
 	"github.com/erikdubbelboer/gspt"
 	"github.com/pkg/errors"
 	"github.com/rancher/k3s/pkg/version"
@@ -21,7 +21,7 @@ func HandleInit() error {
 		return nil
 	}
 
-	if !userns.RunningInUserNS() {
+	if !sys.RunningInUserNS() {
 		// The root cgroup has to be empty to enable subtree_control, so evacuate it by placing
 		// ourselves in the init cgroup.
 		if err := cgrouputil.EvacuateCgroup2("init"); err != nil {

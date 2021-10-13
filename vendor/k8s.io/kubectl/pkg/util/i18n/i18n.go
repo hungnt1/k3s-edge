@@ -19,18 +19,16 @@ package i18n
 import (
 	"archive/zip"
 	"bytes"
-	"embed"
 	"errors"
 	"fmt"
 	"os"
 	"strings"
 
+	"k8s.io/kubectl/pkg/generated"
+
 	"github.com/chai2010/gettext-go/gettext"
 	"k8s.io/klog/v2"
 )
-
-//go:embed translations
-var translations embed.FS
 
 var knownTranslations = map[string][]string{
 	"kubectl": {
@@ -114,7 +112,7 @@ func LoadTranslations(root string, getLanguageFn func() string) error {
 		if err != nil {
 			return err
 		}
-		data, err := translations.ReadFile(filename)
+		data, err := generated.Asset(filename)
 		if err != nil {
 			return err
 		}

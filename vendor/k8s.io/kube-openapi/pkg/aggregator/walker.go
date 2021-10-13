@@ -19,7 +19,7 @@ package aggregator
 import (
 	"strings"
 
-	"k8s.io/kube-openapi/pkg/validation/spec"
+	"github.com/go-openapi/spec"
 )
 
 const (

@@ -39,7 +39,12 @@ func startHPAController(ctx ControllerContext) (http.Handler, bool, error) {
 		return nil, false, nil
 	}
 
-	return startHPAControllerWithRESTClient(ctx)
+	if ctx.ComponentConfig.HPAController.HorizontalPodAutoscalerUseRESTClients {
+		// use the new-style clients if support for custom metrics is enabled
+		return startHPAControllerWithRESTClient(ctx)
+	}
+
+	return startHPAControllerWithLegacyClient(ctx)
 }
 
 func startHPAControllerWithRESTClient(ctx ControllerContext) (http.Handler, bool, error) {
@@ -58,6 +63,18 @@ func startHPAControllerWithRESTClient(ctx ControllerContext) (http.Handler, bool
 		resourceclient.NewForConfigOrDie(clientConfig),
 		custom_metrics.NewForConfig(clientConfig, ctx.RESTMapper, apiVersionsGetter),
 		external_metrics.NewForConfigOrDie(clientConfig),
+	)
+	return startHPAControllerWithMetricsClient(ctx, metricsClient)
+}
+
+func startHPAControllerWithLegacyClient(ctx ControllerContext) (http.Handler, bool, error) {
+	hpaClient := ctx.ClientBuilder.ClientOrDie("horizontal-pod-autoscaler")
+	metricsClient := metrics.NewHeapsterMetricsClient(
+		hpaClient,
+		metrics.DefaultHeapsterNamespace,
+		metrics.DefaultHeapsterScheme,
+		metrics.DefaultHeapsterService,
+		metrics.DefaultHeapsterPort,
 	)
 	return startHPAControllerWithMetricsClient(ctx, metricsClient)
 }

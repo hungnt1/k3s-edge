@@ -69,28 +69,6 @@ func GetFirst4String(elems []string) (string, error) {
 	return ip.String(), nil
 }
 
-// JoinIP4Nets stringifies and joins a list of IPv4 networks with commas.
-func JoinIP4Nets(elems []*net.IPNet) string {
-	var strs []string
-	for _, elem := range elems {
-		if elem != nil && elem.IP.To4() != nil {
-			strs = append(strs, elem.String())
-		}
-	}
-	return strings.Join(strs, ",")
-}
-
-// JoinIP6Nets stringifies and joins a list of IPv6 networks with commas.
-func JoinIP6Nets(elems []*net.IPNet) string {
-	var strs []string
-	for _, elem := range elems {
-		if elem != nil && elem.IP.To4() == nil {
-			strs = append(strs, elem.String())
-		}
-	}
-	return strings.Join(strs, ",")
-}
-
 // GetHostnameAndIPs takes a node name and list of IPs, usually from CLI args.
 // If set, these are used to return the node's name and addresses. If not set,
 // the system hostname and primary interface address are returned instead.

@@ -204,10 +204,6 @@ func isRunningAndReady(pod *v1.Pod) bool {
 	return pod.Status.Phase == v1.PodRunning && podutil.IsPodReady(pod)
 }
 
-func isRunningAndAvailable(pod *v1.Pod, minReadySeconds int32) bool {
-	return podutil.IsPodAvailable(pod, minReadySeconds, metav1.Now())
-}
-
 // isCreated returns true if pod has been created and is maintained by the API server
 func isCreated(pod *v1.Pod) bool {
 	return pod.Status.Phase != ""
@@ -295,10 +291,7 @@ func getPatch(set *apps.StatefulSet) ([]byte, error) {
 		return nil, err
 	}
 	var raw map[string]interface{}
-	err = json.Unmarshal(data, &raw)
-	if err != nil {
-		return nil, err
-	}
+	json.Unmarshal(data, &raw)
 	objCopy := make(map[string]interface{})
 	specCopy := make(map[string]interface{})
 	spec := raw["spec"].(map[string]interface{})
@@ -373,7 +366,6 @@ func inconsistentStatus(set *apps.StatefulSet, status *apps.StatefulSetStatus) b
 		status.ReadyReplicas != set.Status.ReadyReplicas ||
 		status.UpdatedReplicas != set.Status.UpdatedReplicas ||
 		status.CurrentRevision != set.Status.CurrentRevision ||
-		status.AvailableReplicas != set.Status.AvailableReplicas ||
 		status.UpdateRevision != set.Status.UpdateRevision
 }
 

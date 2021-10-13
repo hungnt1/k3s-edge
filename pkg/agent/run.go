@@ -3,12 +3,15 @@ package agent
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/containerd/cgroups"
+	cgroupsv2 "github.com/containerd/cgroups/v2"
 	systemd "github.com/coreos/go-systemd/daemon"
 	"github.com/pkg/errors"
 	"github.com/rancher/k3s/pkg/agent/config"
@@ -18,7 +21,6 @@ import (
 	"github.com/rancher/k3s/pkg/agent/proxy"
 	"github.com/rancher/k3s/pkg/agent/syssetup"
 	"github.com/rancher/k3s/pkg/agent/tunnel"
-	"github.com/rancher/k3s/pkg/cgroups"
 	"github.com/rancher/k3s/pkg/cli/cmds"
 	"github.com/rancher/k3s/pkg/clientaccess"
 	cp "github.com/rancher/k3s/pkg/cloudprovider"
@@ -35,11 +37,41 @@ import (
 	"k8s.io/client-go/kubernetes"
 	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/controller-manager/app"
 	app2 "k8s.io/kubernetes/cmd/kube-proxy/app"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	utilsnet "k8s.io/utils/net"
 	utilpointer "k8s.io/utils/pointer"
 )
+
+const (
+	dockershimSock = "unix:///var/run/dockershim.sock"
+	containerdSock = "unix:///run/k3s/containerd/containerd.sock"
+)
+
+// setupCriCtlConfig creates the crictl config file and populates it
+// with the given data from config.
+func setupCriCtlConfig(cfg cmds.Agent, nodeConfig *daemonconfig.Node) error {
+	cre := nodeConfig.ContainerRuntimeEndpoint
+	if cre == "" {
+		switch {
+		case cfg.Docker:
+			cre = dockershimSock
+		default:
+			cre = containerdSock
+		}
+	}
+
+	agentConfDir := filepath.Join(cfg.DataDir, "agent", "etc")
+	if _, err := os.Stat(agentConfDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(agentConfDir, 0700); err != nil {
+			return err
+		}
+	}
+
+	crp := "runtime-endpoint: " + cre + "\n"
+	return ioutil.WriteFile(agentConfDir+"/crictl.yaml", []byte(crp), 0600)
+}
 
 func run(ctx context.Context, cfg cmds.Agent, proxy proxy.Proxy) error {
 	nodeConfig := config.Get(ctx, cfg, proxy)
@@ -96,7 +128,7 @@ func run(ctx context.Context, cfg cmds.Agent, proxy proxy.Proxy) error {
 		return err
 	}
 
-	util.WaitForAPIServerReady(coreClient, 30*time.Second)
+	app.WaitForAPIServer(coreClient, 30*time.Second)
 
 	if !nodeConfig.NoFlannel {
 		if err := flannel.Run(ctx, nodeConfig, coreClient.CoreV1().Nodes()); err != nil {
@@ -138,7 +170,7 @@ func getConntrackConfig(nodeConfig *daemonconfig.Node) (*kubeproxyconfig.KubePro
 	}
 
 	cmd := app2.NewProxyCommand()
-	if err := cmd.ParseFlags(daemonconfig.GetArgs(map[string]string{}, nodeConfig.AgentConfig.ExtraKubeProxyArgs)); err != nil {
+	if err := cmd.ParseFlags(daemonconfig.GetArgsList(map[string]string{}, nodeConfig.AgentConfig.ExtraKubeProxyArgs)); err != nil {
 		return nil, err
 	}
 	maxPerCore, err := cmd.Flags().GetInt32("conntrack-max-per-core")
@@ -174,7 +206,7 @@ func coreClient(cfg string) (kubernetes.Interface, error) {
 }
 
 func Run(ctx context.Context, cfg cmds.Agent) error {
-	if err := cgroups.Validate(); err != nil {
+	if err := validate(); err != nil {
 		return err
 	}
 
@@ -210,6 +242,53 @@ func Run(ctx context.Context, cfg cmds.Agent) error {
 	}
 
 	return run(ctx, cfg, proxy)
+}
+
+func validate() error {
+	if cgroups.Mode() == cgroups.Unified {
+		return validateCgroupsV2()
+	}
+	return validateCgroupsV1()
+}
+
+func validateCgroupsV1() error {
+	cgroups, err := ioutil.ReadFile("/proc/self/cgroup")
+	if err != nil {
+		return err
+	}
+
+	if !strings.Contains(string(cgroups), "cpuset") {
+		logrus.Warn(`Failed to find cpuset cgroup, you may need to add "cgroup_enable=cpuset" to your linux cmdline (/boot/cmdline.txt on a Raspberry Pi)`)
+	}
+
+	if !strings.Contains(string(cgroups), "memory") {
+		msg := "ailed to find memory cgroup, you may need to add \"cgroup_memory=1 cgroup_enable=memory\" to your linux cmdline (/boot/cmdline.txt on a Raspberry Pi)"
+		logrus.Error("F" + msg)
+		return errors.New("f" + msg)
+	}
+
+	return nil
+}
+
+func validateCgroupsV2() error {
+	manager, err := cgroupsv2.LoadManager("/sys/fs/cgroup", "/")
+	if err != nil {
+		return err
+	}
+	controllers, err := manager.RootControllers()
+	if err != nil {
+		return err
+	}
+	m := make(map[string]struct{})
+	for _, controller := range controllers {
+		m[controller] = struct{}{}
+	}
+	for _, controller := range []string{"cpu", "cpuset", "memory"} {
+		if _, ok := m[controller]; !ok {
+			return fmt.Errorf("failed to find %s cgroup (v2)", controller)
+		}
+	}
+	return nil
 }
 
 func configureNode(ctx context.Context, agentConfig *daemonconfig.Agent, nodes v1.NodeInterface) error {
@@ -326,22 +405,14 @@ func updateAddressAnnotations(agentConfig *daemonconfig.Agent, nodeAnnotations m
 // start the agent before the tunnel is setup to allow kubelet to start first and start the pods
 func setupTunnelAndRunAgent(ctx context.Context, nodeConfig *daemonconfig.Node, cfg cmds.Agent, proxy proxy.Proxy) error {
 	var agentRan bool
-	// IsAPIServerLBEnabled is used as a shortcut for detecting RKE2, where the kubelet needs to
-	// be run earlier in order to manage static pods. This should probably instead query a
-	// flag on the executor or something.
 	if cfg.ETCDAgent {
-		// ETCDAgent is only set to true on servers that are started with --disable-apiserver.
-		// In this case, we may be running without an apiserver available in the cluster, and need
-		// to wait for one to register and post it's address into APIAddressCh so that we can update
-		// the LB proxy with its address.
+		// only in rke2 run the agent before the tunnel setup and check for that later in the function
 		if proxy.IsAPIServerLBEnabled() {
-			// On RKE2, the agent needs to be started early to run the etcd static pod.
-			if err := agent.Agent(ctx, nodeConfig, proxy); err != nil {
+			if err := agent.Agent(&nodeConfig.AgentConfig); err != nil {
 				return err
 			}
 			agentRan = true
 		}
-
 		select {
 		case address := <-cfg.APIAddressCh:
 			cfg.ServerURL = address
@@ -354,9 +425,7 @@ func setupTunnelAndRunAgent(ctx context.Context, nodeConfig *daemonconfig.Node, 
 			return ctx.Err()
 		}
 	} else if cfg.ClusterReset && proxy.IsAPIServerLBEnabled() {
-		// If we're doing a cluster-reset on RKE2, the kubelet needs to be started early to clean
-		// up static pods.
-		if err := agent.Agent(ctx, nodeConfig, proxy); err != nil {
+		if err := agent.Agent(&nodeConfig.AgentConfig); err != nil {
 			return err
 		}
 		agentRan = true
@@ -366,7 +435,7 @@ func setupTunnelAndRunAgent(ctx context.Context, nodeConfig *daemonconfig.Node, 
 		return err
 	}
 	if !agentRan {
-		return agent.Agent(ctx, nodeConfig, proxy)
+		return agent.Agent(&nodeConfig.AgentConfig)
 	}
 	return nil
 }

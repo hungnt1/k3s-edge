@@ -30,36 +30,13 @@ type PassiveClock interface {
 // needs to do arbitrary things based on time.
 type Clock interface {
 	PassiveClock
-	// After returns the channel of a new Timer.
-	// This method does not allow to free/GC the backing timer before it fires. Use
-	// NewTimer instead.
 	After(d time.Duration) <-chan time.Time
-	// NewTimer returns a new Timer.
 	NewTimer(d time.Duration) Timer
-	// Sleep sleeps for the provided duration d.
-	// Consider making the sleep interruptible by using 'select' on a context channel and a timer channel.
 	Sleep(d time.Duration)
-	// Tick returns the channel of a new Ticker.
-	// This method does not allow to free/GC the backing ticker. Use
-	// NewTicker from WithTicker instead.
 	Tick(d time.Duration) <-chan time.Time
 }
 
-// WithTicker allows for injecting fake or real clocks into code that
-// needs to do arbitrary things based on time.
-type WithTicker interface {
-	Clock
-	// NewTicker returns a new Ticker.
-	NewTicker(time.Duration) Ticker
-}
-
-// Ticker defines the Ticker interface.
-type Ticker interface {
-	C() <-chan time.Time
-	Stop()
-}
-
-var _ = WithTicker(RealClock{})
+var _ = Clock(RealClock{})
 
 // RealClock really calls time.Now()
 type RealClock struct{}
@@ -75,8 +52,6 @@ func (RealClock) Since(ts time.Time) time.Duration {
 }
 
 // After is the same as time.After(d).
-// This method does not allow to free/GC the backing timer before it fires. Use
-// NewTimer instead.
 func (RealClock) After(d time.Duration) <-chan time.Time {
 	return time.After(d)
 }
@@ -89,21 +64,11 @@ func (RealClock) NewTimer(d time.Duration) Timer {
 }
 
 // Tick is the same as time.Tick(d)
-// This method does not allow to free/GC the backing ticker. Use
-// NewTicker instead.
 func (RealClock) Tick(d time.Duration) <-chan time.Time {
 	return time.Tick(d)
 }
 
-// NewTicker returns a new Ticker.
-func (RealClock) NewTicker(d time.Duration) Ticker {
-	return &realTicker{
-		ticker: time.NewTicker(d),
-	}
-}
-
 // Sleep is the same as time.Sleep(d)
-// Consider making the sleep interruptible by using 'select' on a context channel and a timer channel.
 func (RealClock) Sleep(d time.Duration) {
 	time.Sleep(d)
 }
@@ -136,16 +101,4 @@ func (r *realTimer) Stop() bool {
 // Reset calls Reset() on the underlying timer.
 func (r *realTimer) Reset(d time.Duration) bool {
 	return r.timer.Reset(d)
-}
-
-type realTicker struct {
-	ticker *time.Ticker
-}
-
-func (r *realTicker) C() <-chan time.Time {
-	return r.ticker.C
-}
-
-func (r *realTicker) Stop() {
-	r.ticker.Stop()
 }

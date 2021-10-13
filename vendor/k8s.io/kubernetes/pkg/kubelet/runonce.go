@@ -17,12 +17,11 @@ limitations under the License.
 package kubelet
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -131,7 +130,12 @@ func (kl *Kubelet) runPod(pod *v1.Pod, retryDelay time.Duration) error {
 			klog.ErrorS(err, "Failed creating a mirror pod", "pod", klog.KObj(pod))
 		}
 		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
-		if err = kl.syncPod(context.Background(), kubetypes.SyncPodUpdate, pod, mirrorPod, status); err != nil {
+		if err = kl.syncPod(syncPodOptions{
+			pod:        pod,
+			mirrorPod:  mirrorPod,
+			podStatus:  status,
+			updateType: kubetypes.SyncPodUpdate,
+		}); err != nil {
 			return fmt.Errorf("error syncing pod %q: %v", format.Pod(pod), err)
 		}
 		if retry >= runOnceMaxRetries {

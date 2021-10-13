@@ -114,9 +114,9 @@ type InstanceMetadataService struct {
 }
 
 // NewInstanceMetadataService creates an instance of the InstanceMetadataService accessor object.
-func NewInstanceMetadataService(imdsServer string) (*InstanceMetadataService, error) {
+func NewInstanceMetadataService(idmsServer string) (*InstanceMetadataService, error) {
 	ims := &InstanceMetadataService{
-		imdsServer: imdsServer,
+		imdsServer: idmsServer,
 	}
 
 	imsCache, err := azcache.NewTimedcache(metadataCacheTTL, ims.getMetadata)

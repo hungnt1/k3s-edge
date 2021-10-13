@@ -100,11 +100,6 @@ func (namespaceStrategy) Validate(ctx context.Context, obj runtime.Object) field
 	return validation.ValidateNamespace(namespace)
 }
 
-// WarningsOnCreate returns warnings for the creation of the given object.
-func (namespaceStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
-	return nil
-}
-
 // Canonicalize normalizes the object after validation.
 func (namespaceStrategy) Canonicalize(obj runtime.Object) {
 	// Ensure the label matches the name for namespaces just created using GenerateName,
@@ -144,11 +139,6 @@ func (namespaceStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Ob
 	return append(errorList, validation.ValidateNamespaceUpdate(obj.(*api.Namespace), old.(*api.Namespace))...)
 }
 
-// WarningsOnUpdate returns warnings for the given update.
-func (namespaceStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return nil
-}
-
 func (namespaceStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
@@ -179,11 +169,6 @@ func (namespaceStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runt
 	return validation.ValidateNamespaceStatusUpdate(obj.(*api.Namespace), old.(*api.Namespace))
 }
 
-// WarningsOnUpdate returns warnings for the given update.
-func (namespaceStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return nil
-}
-
 type namespaceFinalizeStrategy struct {
 	namespaceStrategy
 }
@@ -192,11 +177,6 @@ var FinalizeStrategy = namespaceFinalizeStrategy{Strategy}
 
 func (namespaceFinalizeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateNamespaceFinalizeUpdate(obj.(*api.Namespace), old.(*api.Namespace))
-}
-
-// WarningsOnUpdate returns warnings for the given update.
-func (namespaceFinalizeStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return nil
 }
 
 // GetResetFields returns the set of fields that get reset by the strategy

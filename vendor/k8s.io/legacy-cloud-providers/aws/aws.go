@@ -2563,7 +2563,7 @@ func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (KubernetesVolumeID, er
 		createType = DefaultVolumeType
 
 	default:
-		return KubernetesVolumeID(""), fmt.Errorf("invalid AWS VolumeType %q", volumeOptions.VolumeType)
+		return "", fmt.Errorf("invalid AWS VolumeType %q", volumeOptions.VolumeType)
 	}
 
 	request := &ec2.CreateVolumeInput{}
@@ -2595,12 +2595,12 @@ func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (KubernetesVolumeID, er
 
 	response, err := c.ec2.CreateVolume(request)
 	if err != nil {
-		return KubernetesVolumeID(""), err
+		return "", err
 	}
 
 	awsID := EBSVolumeID(aws.StringValue(response.VolumeId))
 	if awsID == "" {
-		return KubernetesVolumeID(""), fmt.Errorf("VolumeID was not returned by CreateVolume")
+		return "", fmt.Errorf("VolumeID was not returned by CreateVolume")
 	}
 	volumeName := KubernetesVolumeID("aws://" + aws.StringValue(response.AvailabilityZone) + "/" + string(awsID))
 
@@ -2613,22 +2613,8 @@ func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (KubernetesVolumeID, er
 		// because Kubernetes may have limited permissions to the key.
 		if isAWSErrorVolumeNotFound(err) {
 			err = fmt.Errorf("failed to create encrypted volume: the volume disappeared after creation, most likely due to inaccessible KMS encryption key")
-		} else {
-			// When DescribeVolumes api failed, plugin will lose track on the volumes' state
-			// driver should be able to clean up these kind of volumes to make sure they are not leaked on customers' account
-			klog.V(5).Infof("Failed to create the volume %v due to %v. Will try to delete it.", volumeName, err)
-			awsDisk, newDiskError := newAWSDisk(c, volumeName)
-			if newDiskError != nil {
-				klog.Errorf("Failed to delete the volume %v due to error: %v", volumeName, newDiskError)
-			} else {
-				if _, deleteVolumeError := awsDisk.deleteVolume(); deleteVolumeError != nil {
-					klog.Errorf("Failed to delete the volume %v due to error: %v", volumeName, deleteVolumeError)
-				} else {
-					klog.V(5).Infof("%v is deleted because it is not in desired state after waiting", volumeName)
-				}
-			}
 		}
-		return KubernetesVolumeID(""), err
+		return "", err
 	}
 
 	return volumeName, nil

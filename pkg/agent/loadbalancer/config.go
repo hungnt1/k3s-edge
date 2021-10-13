@@ -12,7 +12,10 @@ func (lb *LoadBalancer) writeConfig() error {
 	if err != nil {
 		return err
 	}
-	return util.WriteFile(lb.configFile, string(configOut))
+	if err := util.WriteFile(lb.configFile, string(configOut)); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (lb *LoadBalancer) updateConfig() error {

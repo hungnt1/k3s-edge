@@ -26,6 +26,7 @@ import (
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
@@ -43,8 +44,8 @@ const (
 	maxAttachedVolumeMetadataSize = 256 * (1 << 10) // 256 kB
 	maxVolumeErrorMessageSize     = 1024
 
-	csiNodeIDMaxLength       = 192
-	csiNodeIDLongerMaxLength = 256
+	csiNodeIDMaxLength       = 128
+	csiNodeIDLongerMaxLength = 192
 )
 
 // CSINodeValidationOptions contains the validation options for validating CSINode
@@ -90,7 +91,9 @@ func validateProvisioner(provisioner string, fldPath *field.Path) field.ErrorLis
 		allErrs = append(allErrs, field.Required(fldPath, provisioner))
 	}
 	if len(provisioner) > 0 {
-		allErrs = append(allErrs, apivalidation.ValidateQualifiedName(strings.ToLower(provisioner), fldPath)...)
+		for _, msg := range validation.IsQualifiedName(strings.ToLower(provisioner)) {
+			allErrs = append(allErrs, field.Invalid(fldPath, provisioner, msg))
+		}
 	}
 	return allErrs
 }
@@ -192,8 +195,7 @@ func validateVolumeAttachmentSource(source *storage.VolumeAttachmentSource, fldP
 			allErrs = append(allErrs, field.Required(fldPath.Child("persistentVolumeName"), "must specify non empty persistentVolumeName"))
 		}
 	case source.InlineVolumeSpec != nil:
-		opts := apivalidation.PersistentVolumeSpecValidationOptions{}
-		allErrs = append(allErrs, apivalidation.ValidatePersistentVolumeSpec(source.InlineVolumeSpec, "", true, fldPath.Child("inlineVolumeSpec"), opts)...)
+		allErrs = append(allErrs, apivalidation.ValidatePersistentVolumeSpec(source.InlineVolumeSpec, "", true, fldPath.Child("inlineVolumeSpec"))...)
 	}
 	return allErrs
 }
@@ -352,7 +354,7 @@ func validateCSINodeDriverNodeID(nodeID string, fldPath *field.Path, validationO
 		maxLength = csiNodeIDLongerMaxLength
 	}
 	if len(nodeID) > maxLength {
-		allErrs = append(allErrs, field.Invalid(fldPath, nodeID, fmt.Sprintf("must be %d characters or less", maxLength)))
+		allErrs = append(allErrs, field.Invalid(fldPath, nodeID, fmt.Sprintf("must be %d characters or less", csiNodeIDMaxLength)))
 	}
 	return allErrs
 }
@@ -399,7 +401,9 @@ func validateCSINodeDriver(driver storage.CSINodeDriver, driverNamesInSpecs sets
 		}
 		topoKeys.Insert(key)
 
-		allErrs = append(allErrs, apivalidation.ValidateQualifiedName(key, fldPath)...)
+		for _, msg := range validation.IsQualifiedName(key) {
+			allErrs = append(allErrs, field.Invalid(fldPath, driver.TopologyKeys, msg))
+		}
 	}
 
 	return allErrs

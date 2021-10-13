@@ -115,16 +115,15 @@ func run(app *cli.Context, cfg *cmds.Server, leaderControllers server.CustomCont
 	serverConfig.ControlConfig.ExtraSchedulerAPIArgs = cfg.ExtraSchedulerArgs
 	serverConfig.ControlConfig.ClusterDomain = cfg.ClusterDomain
 	serverConfig.ControlConfig.Datastore.Endpoint = cfg.DatastoreEndpoint
-	serverConfig.ControlConfig.Datastore.BackendTLSConfig.CAFile = cfg.DatastoreCAFile
-	serverConfig.ControlConfig.Datastore.BackendTLSConfig.CertFile = cfg.DatastoreCertFile
-	serverConfig.ControlConfig.Datastore.BackendTLSConfig.KeyFile = cfg.DatastoreKeyFile
+	serverConfig.ControlConfig.Datastore.CAFile = cfg.DatastoreCAFile
+	serverConfig.ControlConfig.Datastore.CertFile = cfg.DatastoreCertFile
+	serverConfig.ControlConfig.Datastore.KeyFile = cfg.DatastoreKeyFile
 	serverConfig.ControlConfig.AdvertiseIP = cfg.AdvertiseIP
 	serverConfig.ControlConfig.AdvertisePort = cfg.AdvertisePort
 	serverConfig.ControlConfig.FlannelBackend = cfg.FlannelBackend
 	serverConfig.ControlConfig.ExtraCloudControllerArgs = cfg.ExtraCloudControllerArgs
 	serverConfig.ControlConfig.DisableCCM = cfg.DisableCCM
 	serverConfig.ControlConfig.DisableNPC = cfg.DisableNPC
-	serverConfig.ControlConfig.DisableHelmController = cfg.DisableHelmController
 	serverConfig.ControlConfig.DisableKubeProxy = cfg.DisableKubeProxy
 	serverConfig.ControlConfig.DisableETCD = cfg.DisableETCD
 	serverConfig.ControlConfig.DisableAPIServer = cfg.DisableAPIServer
@@ -149,7 +148,6 @@ func run(app *cli.Context, cfg *cmds.Server, leaderControllers server.CustomCont
 		serverConfig.ControlConfig.EtcdS3BucketName = cfg.EtcdS3BucketName
 		serverConfig.ControlConfig.EtcdS3Region = cfg.EtcdS3Region
 		serverConfig.ControlConfig.EtcdS3Folder = cfg.EtcdS3Folder
-		serverConfig.ControlConfig.EtcdS3Insecure = cfg.EtcdS3Insecure
 	} else {
 		logrus.Info("ETCD snapshots are disabled")
 	}
@@ -227,7 +225,6 @@ func run(app *cli.Context, cfg *cmds.Server, leaderControllers server.CustomCont
 	if err != nil {
 		return err
 	}
-	serverConfig.ControlConfig.ServerNodeName = nodeName
 	serverConfig.ControlConfig.SANs = append(serverConfig.ControlConfig.SANs, "127.0.0.1", "localhost", nodeName)
 	for _, ip := range nodeIPs {
 		serverConfig.ControlConfig.SANs = append(serverConfig.ControlConfig.SANs, ip.String())
@@ -389,11 +386,9 @@ func run(app *cli.Context, cfg *cmds.Server, leaderControllers server.CustomCont
 
 	logrus.Info("Starting " + version.Program + " " + app.App.Version)
 
-	notifySocket := os.Getenv("NOTIFY_SOCKET")
-
 	ctx := signals.SetupSignalHandler(context.Background())
 
-	if err := server.StartServer(ctx, &serverConfig, cfg); err != nil {
+	if err := server.StartServer(ctx, &serverConfig); err != nil {
 		return err
 	}
 
@@ -407,8 +402,7 @@ func run(app *cli.Context, cfg *cmds.Server, leaderControllers server.CustomCont
 		}
 
 		logrus.Info(version.Program + " is up and running")
-		if (cfg.DisableAgent || cfg.DisableAPIServer) && notifySocket != "" {
-			os.Setenv("NOTIFY_SOCKET", notifySocket)
+		if (cfg.DisableAgent || cfg.DisableAPIServer) && os.Getenv("NOTIFY_SOCKET") != "" {
 			systemd.SdNotify(true, "READY=1\n")
 		}
 	}()
@@ -472,8 +466,8 @@ func validateNetworkConfiguration(serverConfig server.Config) error {
 		return errors.Wrap(err, "failed to validate cluster-dns")
 	}
 
-	if (serverConfig.ControlConfig.DisableNPC == false) && (dualCluster || dualService) {
-		return errors.New("network policy enforcement is not compatible with dual-stack operation; server must be restarted with --disable-network-policy")
+	if (serverConfig.ControlConfig.FlannelBackend != "none" || serverConfig.ControlConfig.DisableNPC == false) && (dualCluster || dualService) {
+		return errors.New("flannel CNI and network policy enforcement are not compatible with dual-stack operation; server must be restarted with --flannel-backend=none --disable-network-policy and an alternative CNI plugin deployed")
 	}
 	if dualDNS == true {
 		return errors.New("dual-stack cluster-dns is not supported")

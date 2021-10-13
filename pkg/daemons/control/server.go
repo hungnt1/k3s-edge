@@ -16,18 +16,19 @@ import (
 	"github.com/rancher/k3s/pkg/daemons/config"
 	"github.com/rancher/k3s/pkg/daemons/control/deps"
 	"github.com/rancher/k3s/pkg/daemons/executor"
-	"github.com/rancher/k3s/pkg/util"
+	util2 "github.com/rancher/k3s/pkg/util"
 	"github.com/rancher/k3s/pkg/version"
+	"github.com/rancher/wrangler-api/pkg/generated/controllers/rbac"
 	"github.com/sirupsen/logrus"
-	authorizationv1 "k8s.io/api/authorization/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/client-go/kubernetes"
-	authorizationv1client "k8s.io/client-go/kubernetes/typed/authorization/v1"
 	"k8s.io/client-go/tools/clientcmd"
+	app2 "k8s.io/controller-manager/app"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
-	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
+	"k8s.io/kubernetes/pkg/proxy/util"
 
 	// for client metric registration
 	_ "k8s.io/component-base/metrics/prometheus/restclient"
@@ -46,7 +47,7 @@ func Server(ctx context.Context, cfg *config.Control) error {
 	}
 
 	cfg.Runtime.Tunnel = setupTunnel()
-	proxyutil.DisableProxyHostnameCheck = true
+	util.DisableProxyHostnameCheck = true
 
 	var auth authenticator.Request
 	var handler http.Handler
@@ -71,12 +72,12 @@ func Server(ctx context.Context, cfg *config.Control) error {
 	runtime.Handler = handler
 
 	if !cfg.DisableScheduler {
-		if err := scheduler(ctx, cfg, runtime); err != nil {
+		if err := scheduler(cfg, runtime); err != nil {
 			return err
 		}
 	}
 	if !cfg.DisableControllerManager {
-		if err := controllerManager(ctx, cfg, runtime); err != nil {
+		if err := controllerManager(cfg, runtime); err != nil {
 			return err
 		}
 	}
@@ -90,19 +91,18 @@ func Server(ctx context.Context, cfg *config.Control) error {
 	return nil
 }
 
-func controllerManager(ctx context.Context, cfg *config.Control, runtime *config.ControlRuntime) error {
+func controllerManager(cfg *config.Control, runtime *config.ControlRuntime) error {
 	argsMap := map[string]string{
-		"feature-gates":                    "JobTrackingWithFinalizers=true",
 		"kubeconfig":                       runtime.KubeConfigController,
-		"authorization-kubeconfig":         runtime.KubeConfigController,
-		"authentication-kubeconfig":        runtime.KubeConfigController,
 		"service-account-private-key-file": runtime.ServiceKey,
 		"allocate-node-cidrs":              "true",
-		"cluster-cidr":                     util.JoinIPNets(cfg.ClusterIPRanges),
+		"cluster-cidr":                     util2.JoinIPNets(cfg.ClusterIPRanges),
 		"root-ca-file":                     runtime.ServerCA,
+		"port":                             "10252",
 		"profiling":                        "false",
+		"address":                          localhostIP.String(),
 		"bind-address":                     localhostIP.String(),
-		"secure-port":                      "10257",
+		"secure-port":                      "0",
 		"use-service-account-credentials":  "true",
 		"cluster-signing-kube-apiserver-client-cert-file": runtime.ClientCA,
 		"cluster-signing-kube-apiserver-client-key-file":  runtime.ClientCAKey,
@@ -121,34 +121,32 @@ func controllerManager(ctx context.Context, cfg *config.Control, runtime *config
 		argsMap["controllers"] = "*,-service,-route,-cloud-node-lifecycle"
 	}
 
-	args := config.GetArgs(argsMap, cfg.ExtraControllerArgs)
+	args := config.GetArgsList(argsMap, cfg.ExtraControllerArgs)
 	logrus.Infof("Running kube-controller-manager %s", config.ArgString(args))
 
-	return executor.ControllerManager(ctx, runtime.APIServerReady, args)
+	return executor.ControllerManager(runtime.APIServerReady, args)
 }
 
-func scheduler(ctx context.Context, cfg *config.Control, runtime *config.ControlRuntime) error {
+func scheduler(cfg *config.Control, runtime *config.ControlRuntime) error {
 	argsMap := map[string]string{
-		"kubeconfig":                runtime.KubeConfigScheduler,
-		"authorization-kubeconfig":  runtime.KubeConfigScheduler,
-		"authentication-kubeconfig": runtime.KubeConfigScheduler,
-		"bind-address":              localhostIP.String(),
-		"secure-port":               "10259",
-		"profiling":                 "false",
+		"kubeconfig":   runtime.KubeConfigScheduler,
+		"port":         "10251",
+		"address":      "127.0.0.1",
+		"bind-address": "127.0.0.1",
+		"secure-port":  "0",
+		"profiling":    "false",
 	}
 	if cfg.NoLeaderElect {
 		argsMap["leader-elect"] = "false"
 	}
-	args := config.GetArgs(argsMap, cfg.ExtraSchedulerAPIArgs)
+	args := config.GetArgsList(argsMap, cfg.ExtraSchedulerAPIArgs)
 
 	logrus.Infof("Running kube-scheduler %s", config.ArgString(args))
-	return executor.Scheduler(ctx, runtime.APIServerReady, args)
+	return executor.Scheduler(runtime.APIServerReady, args)
 }
 
 func apiServer(ctx context.Context, cfg *config.Control, runtime *config.ControlRuntime) (authenticator.Request, http.Handler, error) {
-	argsMap := map[string]string{
-		"feature-gates": "JobTrackingWithFinalizers=true",
-	}
+	argsMap := make(map[string]string)
 
 	setupStorageBackend(argsMap, cfg)
 
@@ -159,7 +157,7 @@ func apiServer(ctx context.Context, cfg *config.Control, runtime *config.Control
 	argsMap["allow-privileged"] = "true"
 	argsMap["authorization-mode"] = strings.Join([]string{modes.ModeNode, modes.ModeRBAC}, ",")
 	argsMap["service-account-signing-key-file"] = runtime.ServiceKey
-	argsMap["service-cluster-ip-range"] = util.JoinIPNets(cfg.ServiceIPRanges)
+	argsMap["service-cluster-ip-range"] = util2.JoinIPNets(cfg.ServiceIPRanges)
 	argsMap["service-node-port-range"] = cfg.ServiceNodePortRange.String()
 	argsMap["advertise-port"] = strconv.Itoa(cfg.AdvertisePort)
 	if cfg.AdvertiseIP != "" {
@@ -194,7 +192,7 @@ func apiServer(ctx context.Context, cfg *config.Control, runtime *config.Control
 	if cfg.EncryptSecrets {
 		argsMap["encryption-provider-config"] = runtime.EncryptionConfig
 	}
-	args := config.GetArgs(argsMap, cfg.ExtraAPIArgs)
+	args := config.GetArgsList(argsMap, cfg.ExtraAPIArgs)
 
 	logrus.Infof("Running kube-apiserver %s", config.ArgString(args))
 
@@ -250,7 +248,62 @@ func prepare(ctx context.Context, config *config.Control, runtime *config.Contro
 	os.MkdirAll(filepath.Join(config.DataDir, "tls"), 0700)
 	os.MkdirAll(filepath.Join(config.DataDir, "cred"), 0700)
 
-	deps.FillRuntimeCerts(config, runtime)
+	runtime.ClientCA = filepath.Join(config.DataDir, "tls", "client-ca.crt")
+	runtime.ClientCAKey = filepath.Join(config.DataDir, "tls", "client-ca.key")
+	runtime.ServerCA = filepath.Join(config.DataDir, "tls", "server-ca.crt")
+	runtime.ServerCAKey = filepath.Join(config.DataDir, "tls", "server-ca.key")
+	runtime.RequestHeaderCA = filepath.Join(config.DataDir, "tls", "request-header-ca.crt")
+	runtime.RequestHeaderCAKey = filepath.Join(config.DataDir, "tls", "request-header-ca.key")
+	runtime.IPSECKey = filepath.Join(config.DataDir, "cred", "ipsec.psk")
+
+	runtime.ServiceKey = filepath.Join(config.DataDir, "tls", "service.key")
+	runtime.PasswdFile = filepath.Join(config.DataDir, "cred", "passwd")
+	runtime.NodePasswdFile = filepath.Join(config.DataDir, "cred", "node-passwd")
+
+	runtime.KubeConfigAdmin = filepath.Join(config.DataDir, "cred", "admin.kubeconfig")
+	runtime.KubeConfigController = filepath.Join(config.DataDir, "cred", "controller.kubeconfig")
+	runtime.KubeConfigScheduler = filepath.Join(config.DataDir, "cred", "scheduler.kubeconfig")
+	runtime.KubeConfigAPIServer = filepath.Join(config.DataDir, "cred", "api-server.kubeconfig")
+	runtime.KubeConfigCloudController = filepath.Join(config.DataDir, "cred", "cloud-controller.kubeconfig")
+
+	runtime.ClientAdminCert = filepath.Join(config.DataDir, "tls", "client-admin.crt")
+	runtime.ClientAdminKey = filepath.Join(config.DataDir, "tls", "client-admin.key")
+	runtime.ClientControllerCert = filepath.Join(config.DataDir, "tls", "client-controller.crt")
+	runtime.ClientControllerKey = filepath.Join(config.DataDir, "tls", "client-controller.key")
+	runtime.ClientCloudControllerCert = filepath.Join(config.DataDir, "tls", "client-"+version.Program+"-cloud-controller.crt")
+	runtime.ClientCloudControllerKey = filepath.Join(config.DataDir, "tls", "client-"+version.Program+"-cloud-controller.key")
+	runtime.ClientSchedulerCert = filepath.Join(config.DataDir, "tls", "client-scheduler.crt")
+	runtime.ClientSchedulerKey = filepath.Join(config.DataDir, "tls", "client-scheduler.key")
+	runtime.ClientKubeAPICert = filepath.Join(config.DataDir, "tls", "client-kube-apiserver.crt")
+	runtime.ClientKubeAPIKey = filepath.Join(config.DataDir, "tls", "client-kube-apiserver.key")
+	runtime.ClientKubeProxyCert = filepath.Join(config.DataDir, "tls", "client-kube-proxy.crt")
+	runtime.ClientKubeProxyKey = filepath.Join(config.DataDir, "tls", "client-kube-proxy.key")
+	runtime.ClientK3sControllerCert = filepath.Join(config.DataDir, "tls", "client-"+version.Program+"-controller.crt")
+	runtime.ClientK3sControllerKey = filepath.Join(config.DataDir, "tls", "client-"+version.Program+"-controller.key")
+
+	runtime.ServingKubeAPICert = filepath.Join(config.DataDir, "tls", "serving-kube-apiserver.crt")
+	runtime.ServingKubeAPIKey = filepath.Join(config.DataDir, "tls", "serving-kube-apiserver.key")
+
+	runtime.ClientKubeletKey = filepath.Join(config.DataDir, "tls", "client-kubelet.key")
+	runtime.ServingKubeletKey = filepath.Join(config.DataDir, "tls", "serving-kubelet.key")
+
+	runtime.ClientAuthProxyCert = filepath.Join(config.DataDir, "tls", "client-auth-proxy.crt")
+	runtime.ClientAuthProxyKey = filepath.Join(config.DataDir, "tls", "client-auth-proxy.key")
+
+	runtime.ETCDServerCA = filepath.Join(config.DataDir, "tls", "etcd", "server-ca.crt")
+	runtime.ETCDServerCAKey = filepath.Join(config.DataDir, "tls", "etcd", "server-ca.key")
+	runtime.ETCDPeerCA = filepath.Join(config.DataDir, "tls", "etcd", "peer-ca.crt")
+	runtime.ETCDPeerCAKey = filepath.Join(config.DataDir, "tls", "etcd", "peer-ca.key")
+	runtime.ServerETCDCert = filepath.Join(config.DataDir, "tls", "etcd", "server-client.crt")
+	runtime.ServerETCDKey = filepath.Join(config.DataDir, "tls", "etcd", "server-client.key")
+	runtime.PeerServerClientETCDCert = filepath.Join(config.DataDir, "tls", "etcd", "peer-server-client.crt")
+	runtime.PeerServerClientETCDKey = filepath.Join(config.DataDir, "tls", "etcd", "peer-server-client.key")
+	runtime.ClientETCDCert = filepath.Join(config.DataDir, "tls", "etcd", "client.crt")
+	runtime.ClientETCDKey = filepath.Join(config.DataDir, "tls", "etcd", "client.key")
+
+	if config.EncryptSecrets {
+		runtime.EncryptionConfig = filepath.Join(config.DataDir, "cred", "encryption-config.json")
+	}
 
 	cluster := cluster.New(config)
 
@@ -278,35 +331,33 @@ func setupStorageBackend(argsMap map[string]string, cfg *config.Control) {
 		argsMap["etcd-servers"] = cfg.Datastore.Endpoint
 	}
 	// storage backend tls configuration
-	if len(cfg.Datastore.BackendTLSConfig.CAFile) > 0 {
-		argsMap["etcd-cafile"] = cfg.Datastore.BackendTLSConfig.CAFile
+	if len(cfg.Datastore.CAFile) > 0 {
+		argsMap["etcd-cafile"] = cfg.Datastore.CAFile
 	}
-	if len(cfg.Datastore.BackendTLSConfig.CertFile) > 0 {
-		argsMap["etcd-certfile"] = cfg.Datastore.BackendTLSConfig.CertFile
+	if len(cfg.Datastore.CertFile) > 0 {
+		argsMap["etcd-certfile"] = cfg.Datastore.CertFile
 	}
-	if len(cfg.Datastore.BackendTLSConfig.KeyFile) > 0 {
-		argsMap["etcd-keyfile"] = cfg.Datastore.BackendTLSConfig.KeyFile
+	if len(cfg.Datastore.KeyFile) > 0 {
+		argsMap["etcd-keyfile"] = cfg.Datastore.KeyFile
 	}
 }
 
 func cloudControllerManager(ctx context.Context, cfg *config.Control, runtime *config.ControlRuntime) error {
 	argsMap := map[string]string{
 		"profiling":                    "false",
-		"allocate-node-cidrs":          "true",
-		"cloud-provider":               version.Program,
-		"cluster-cidr":                 util.JoinIPNets(cfg.ClusterIPRanges),
-		"configure-cloud-routes":       "false",
-		"kubeconfig":                   runtime.KubeConfigCloudController,
-		"authorization-kubeconfig":     runtime.KubeConfigCloudController,
-		"authentication-kubeconfig":    runtime.KubeConfigCloudController,
-		"node-status-update-frequency": "1m0s",
-		"bind-address":                 "127.0.0.1",
-		"port":                         "0",
+		"allocate-node-cidrs":          "true",                                // ccmOptions.KubeCloudShared.AllocateNodeCIDRs = true
+		"cloud-provider":               version.Program,                       // ccmOptions.KubeCloudShared.CloudProvider.Name = version.Program
+		"cluster-cidr":                 util2.JoinIPNets(cfg.ClusterIPRanges), // ccmOptions.KubeCloudShared.ClusterCIDR = util2.JoinIPNets(cfg.ClusterIPRanges)
+		"configure-cloud-routes":       "false",                               // ccmOptions.KubeCloudShared.ConfigureCloudRoutes = false
+		"kubeconfig":                   runtime.KubeConfigCloudController,     // ccmOptions.Kubeconfig = runtime.KubeConfigCloudController
+		"node-status-update-frequency": "1m0s",                                // ccmOptions.NodeStatusUpdateFrequency = metav1.Duration{Duration: 1 * time.Minute}
+		"bind-address":                 "127.0.0.1",                           // ccmOptions.SecureServing.BindAddress = localhostIP
+		"port":                         "0",                                   // ccmOptions.SecureServing.BindPort = 0
 	}
 	if cfg.NoLeaderElect {
 		argsMap["leader-elect"] = "false"
 	}
-	args := config.GetArgs(argsMap, cfg.ExtraCloudControllerArgs)
+	args := config.GetArgsList(argsMap, cfg.ExtraCloudControllerArgs)
 
 	logrus.Infof("Running cloud-controller-manager %s", config.ArgString(args))
 
@@ -332,9 +383,9 @@ func cloudControllerManager(ctx context.Context, cfg *config.Control, runtime *c
 			select {
 			case <-ctx.Done():
 				return
-			case err := <-promise(func() error { return checkForCloudControllerPrivileges(ctx, runtime, 5*time.Second) }):
+			case err := <-promise(func() error { return checkForCloudControllerPrivileges(runtime, 5*time.Second) }):
 				if err != nil {
-					logrus.Infof("Waiting for cloud-controller-manager privileges to become available: %v", err)
+					logrus.Infof("Waiting for cloud-controller-manager privileges to become available")
 					continue
 				}
 				return
@@ -342,43 +393,30 @@ func cloudControllerManager(ctx context.Context, cfg *config.Control, runtime *c
 		}
 	}()
 
-	return executor.CloudControllerManager(ctx, ccmRBACReady, args)
+	return executor.CloudControllerManager(ccmRBACReady, args)
 }
 
-// checkForCloudControllerPrivileges makes a SubjectAccessReview request to the apiserver
-// to validate that the embedded cloud controller manager has the required privileges,
-// and does not return until the requested access is granted.
-// If the CCM RBAC changes, the ResourceAttributes checked for by this function should
-// be modified to check for the most recently added privilege.
-func checkForCloudControllerPrivileges(ctx context.Context, runtime *config.ControlRuntime, timeout time.Duration) error {
+func checkForCloudControllerPrivileges(runtime *config.ControlRuntime, timeout time.Duration) error {
 	restConfig, err := clientcmd.BuildConfigFromFlags("", runtime.KubeConfigAdmin)
 	if err != nil {
 		return err
 	}
-	authClient := authorizationv1client.NewForConfigOrDie(restConfig)
-	sar := &authorizationv1.SubjectAccessReview{
-		Spec: authorizationv1.SubjectAccessReviewSpec{
-			User: version.Program + "-cloud-controller-manager",
-			ResourceAttributes: &authorizationv1.ResourceAttributes{
-				Namespace: metav1.NamespaceSystem,
-				Verb:      "get",
-				Resource:  "configmaps",
-				Name:      "extension-apiserver-authentication",
-			},
-		},
-	}
-
 	err = wait.PollImmediate(time.Second, timeout, func() (bool, error) {
-		r, err := authClient.SubjectAccessReviews().Create(ctx, sar, metav1.CreateOptions{})
+		crb := rbac.NewFactoryFromConfigOrDie(restConfig).Rbac().V1().ClusterRoleBinding()
+		_, err = crb.Get(version.Program+"-cloud-controller-manager", metav1.GetOptions{})
 		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return false, nil
+			}
 			return false, err
 		}
-		if r.Status.Allowed {
-			return true, nil
-		}
-		return false, nil
+		return true, nil
 	})
-	return err
+
+	if err != nil {
+		logrus.Errorf("error encountered waitng for cloud-controller-manager privileges: %v", err)
+	}
+	return nil
 }
 
 func waitForAPIServerInBackground(ctx context.Context, runtime *config.ControlRuntime) error {
@@ -415,7 +453,7 @@ func waitForAPIServerInBackground(ctx context.Context, runtime *config.ControlRu
 			select {
 			case <-ctx.Done():
 				return
-			case err := <-promise(func() error { return util.WaitForAPIServerReady(k8sClient, 30*time.Second) }):
+			case err := <-promise(func() error { return app2.WaitForAPIServer(k8sClient, 30*time.Second) }):
 				if err != nil {
 					logrus.Infof("Waiting for API server to become available")
 					continue
